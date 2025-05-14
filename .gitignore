@@ -1,0 +1,17 @@
+# ignore macOS local files
+.DS_Store
+# ignore vscode and metals local files
+.metals**
+.vscode**
+project/project**
+project/target**
+project/metals.sbt
+target/*
+sbt-launch.jar
+# ignore sbt local files
+.bsp**
+# ignore local runtime config folder
+config/config.json
+# ignore pergola access key
+_pergola_access_key.zsh
+
