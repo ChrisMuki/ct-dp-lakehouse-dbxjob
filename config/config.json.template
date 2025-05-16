@@ -1,0 +1,16 @@
+{
+    "LogFile": "None",
+    "LogLevel": {
+        "": "ERROR",
+        "ct.dna": "DEBUG",
+        "com.azure.data.tables.TableClient_ResourceNotFound": "FATAL"
+    },
+    "LogTime": "false",
+    "EnvironmentConfig": {
+        "clazz": "RemoteSandbox",
+        "uid": "uia00402",
+        "workspaceUrl": "adb-1695223150250302.2.azuredatabricks.net",
+        "clusterId": "0606-075530-9uskjfpz",
+        "pat": "dapi3ff1f7234447f8935306a2b532621ebe-2"
+    }
+}
