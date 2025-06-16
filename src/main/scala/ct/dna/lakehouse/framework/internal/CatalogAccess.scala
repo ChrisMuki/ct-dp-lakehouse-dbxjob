@@ -11,7 +11,7 @@ sealed trait CatalogAccess {
   def source_fqtn(tableDef: Table): String
 }
 
-object CatalogAccess extends CatalogAccess {
+private[internal] object CatalogAccess extends CatalogAccess {
   lazy val activeCatalogAccess: CatalogAccess = Environment.activeConfig match {
     case Lakehouse(_)                       => ???
     case Staging(_)                         => ???

@@ -1,26 +1,26 @@
 package ct.dna.lakehouse.framework.internal
 import scala.collection.immutable.ArraySeq
 
-import ct.dna.lakehouse.framework.ChangeFeedVersion
+import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{columnName => _lh_framework}
 import ct.dna.lakehouse.transformations.ChangeFeedTable
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SQLImplicits
 import org.apache.spark.sql.functions._
-case class ChangeFeedTableImpl(
+private[internal] case class ChangeFeedTableImpl(
     implicits: SQLImplicits,
     keys: Seq[String],
     fqtn: String,
     df: DataFrame,
     cdf: DataFrame,
-    version: ChangeFeedVersion,
+    version: ChangeFeedTable.Version,
     isSnapshot: Boolean
 ) extends ChangeFeedTable {
   import implicits._
   private val cdfColNames = Seq("_commit_version", "_change_type", "_commit_timestamp")
 
-  lazy val getSnapshot: DataFrame = df.filter($"_lh_metadata".isNull).drop("_lh_metadata")
+  lazy val getSnapshot: DataFrame = df.filter(col(_lh_framework).isNull).drop(_lh_framework)
 
-  lazy val getChangeFeed: DataFrame = cdf.filter($"_lh_metadata".isNull).drop("_lh_metadata")
+  lazy val getChangeFeed: DataFrame = cdf.filter(col(_lh_framework).isNull).drop(_lh_framework)
   def getChangeFeed_last: DataFrame = {
 
     val valueColNames = ArraySeq.unsafeWrapArray(getChangeFeed.columns.filterNot(c => keys.contains(c) || cdfColNames.contains(c)))

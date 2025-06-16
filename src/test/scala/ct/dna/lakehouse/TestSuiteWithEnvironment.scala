@@ -4,9 +4,11 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec._
 import org.scalatest.matchers._
 
+object TestSuiteWithEnvironment
+
 trait TestSuiteWithEnvironment extends AnyFlatSpec with should.Matchers with BeforeAndAfterAll {
   override protected def beforeAll(): Unit = {
-    Environment.initializeAndValidate()
+    Environment.activeConfig
   }
 
 }

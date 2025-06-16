@@ -1,13 +1,15 @@
 package ct.dna.lakehouse.transformations
-import ct.dna.lakehouse.framework.ChangeFeedVersion
 import org.apache.spark.sql.DataFrame
 
+object ChangeFeedTable {
+  case class Version(init: Commit, current: Commit)
+}
 trait ChangeFeedTable {
   val fqtn: String
-  def version: ChangeFeedVersion
+  def version: ChangeFeedTable.Version
   def isSnapshot: Boolean
 
-  /** Does not contain the '_lh_metadata' Row and Column!
+  /** Does not contain the '_lh_framework' Row and Column!
     */
   def getSnapshot: DataFrame
 

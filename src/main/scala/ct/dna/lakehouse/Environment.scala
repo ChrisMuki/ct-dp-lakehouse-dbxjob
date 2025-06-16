@@ -5,15 +5,13 @@ import ct.dna.utils.LoggingTrait
 import ct.dna.utils.json.mapper
 
 object Environment extends LoggingTrait {
-  private var initArgs: Option[Array[String]] = None
 
-  def initializeAndValidate(args: Array[String] = Array.empty) = initArgs match {
-    case None        => { initArgs = Some(args); Configuration.required("EnvironmentConfig").initializeAndValidate(args) }
-    case Some(value) => assert(args == value)
-  }
+  private var initialized = false
+
+  def initializeAndValidate(): Unit = activeConfig
 
   lazy val activeConfig: EnvironmentConfig = {
-    Configuration.ensureInitialized()
+    Configuration.required("EnvironmentConfig").initializeAndValidate(Array.empty)
     mapper.readValue[EnvironmentConfig](Configuration.getProperty("EnvironmentConfig"))
   }
 

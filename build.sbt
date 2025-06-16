@@ -9,8 +9,9 @@ ThisBuild / outputStrategy := Some(StdoutOutput)
 ThisBuild / Test / logBuffered := true
 ThisBuild / Test / parallelExecution := false
 
-javaOptions += "--add-opens=java.base/java.nio=ALL-UNNAMED"
+javaOptions ++= Seq("-Xms1024m", "-Xmx3584m", "-Xss4M", "-XX:ReservedCodeCacheSize=128m", "--add-opens=java.base/java.nio=ALL-UNNAMED")
 Test / fork := true
+fork := true
 
 //https://mvnrepository.com/artifact/com.azure/azure-sdk-bom/1.2.30
 lazy val root = project
@@ -19,15 +20,13 @@ lazy val root = project
     name := "dp-lakehouse-dbxjob",
     libraryDependencies ++= Seq(
       "ct.dna" %% "dp-pipeline" % "3.1.1",
-      // must be prior to 'spark-sql'
-      "org.apache.spark" %% "spark-connect-client-jvm" % "4.0.0-preview2" % Test,
-      "org.apache.spark" %% "spark-core" % "4.0.0-preview2" % Test,
-      "org.apache.spark" %% "spark-sql" % "4.0.0-preview2" % Test,
-      // "io.delta" %% "delta-spark" % "4.0.0" % Test,
-      // "org.apache.spark" %% "spark-connect-client-jvm" % "4.0.0-preview2" % Provided,
-      "org.apache.spark" %% "spark-core" % "4.0.0-preview2" % Provided,
-      "org.apache.spark" %% "spark-sql" % "4.0.0-preview2" % Provided,
-      // "io.delta" %% "delta-spark" % "4.0.0" % Provided,
+      "org.apache.spark" %% "spark-connect-client-jvm" % "4.0.0" % Test,
+      "org.apache.spark" %% "spark-connect-client-jvm" % "4.0.0" % Provided,
+      "io.delta" %% "delta-connect-client" % "4.0.0" % Test,
+      "io.delta" %% "delta-connect-client" % "4.0.0" % Provided,
+
+      // When using "org.apache.spark" %% "spark-sql" % "4.0.0" % Provided, Worksheets does not work properly
+      // "org.apache.spark" %% "spark-sql" % "4.0.0" % Provided,
 
       // For DAG
       "io.github.classgraph" % "classgraph" % "4.8.179",
@@ -38,3 +37,19 @@ lazy val root = project
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )
   )
+
+// // Because sbt does stupid stuff and for some weird reason keeps spark-sql in test scope
+// Test / fullClasspath := {
+//   val cp = (Test / fullClasspath).value
+//   cp.filterNot(attrF => {
+//     val modO = attrF.get(moduleID.key).map { module => (module.organization, module.name) }
+//     modO == Some(("org.apache.spark", "spark-sql_2.13"))
+//   })
+// }
+// Test / unmanagedClasspath := {
+//   val cp = (Test / unmanagedClasspath).value
+//   cp.filterNot(attrF => {
+//     val modO = attrF.get(moduleID.key).map { module => (module.organization, module.name) }
+//     modO == Some(("org.apache.spark", "spark-sql_2.13"))
+//   })
+// }
