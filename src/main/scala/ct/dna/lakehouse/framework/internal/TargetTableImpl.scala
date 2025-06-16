@@ -3,13 +3,13 @@ package ct.dna.lakehouse.framework.internal
 import ct.dna.lakehouse.framework.MergeBuilder
 import ct.dna.lakehouse.framework.UserMetadata.LakehouseMetadata
 import ct.dna.lakehouse.transformations.TargetTable
+import ct.dna.utils.LoggingTrait
 import ct.dna.utils.json.mapper
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions
 import org.apache.spark.sql.functions._
-import ct.dna.utils.LoggingTrait
 
 //TODO we need to ensure that the meta column is always existing!
 case class TargetTableImpl(spark: SparkSession, fqtn: String, df: DataFrame, metadata: LakehouseMetadata, alias: String = "target")
@@ -23,7 +23,7 @@ case class TargetTableImpl(spark: SparkSession, fqtn: String, df: DataFrame, met
   def merge(source: DataFrame, condition: String, sourceAlias: String = "source"): MergeBuilder = merge(source, functions.expr(condition), sourceAlias)
 
   def merge(source: DataFrame, condition: Column, sourceAlias: String): MergeBuilder = {
-    if (merged) logAndThrow(new IllegalStateException(s"TargetTable merge can be called at most once"))
+    if (merged) logAndThrow(new IllegalStateException("TargetTable merge can be called at most once"))
     val source__lh_meta = col(s"$sourceAlias._lh_metadata")
     val target__lh_meta = col(s"$alias._lh_metadata")
     df.createTempView(alias)

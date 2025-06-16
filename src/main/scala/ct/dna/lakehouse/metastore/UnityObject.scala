@@ -13,19 +13,20 @@ abstract class UnityObject private[metastore] (level: String) {
   }
 }
 
-private[metastore] object UnityObject {
-  def deriveTableName(o: AnyRef) = {
+// private[metastore]
+object UnityObject {
+  def deriveTableName(o: Table) = {
     if (o.getClass().getSimpleName().endsWith("$"))
-      this.getClass.getSimpleName.replaceAll("\\$", "")
+      o.getClass.getSimpleName.replaceAll("\\$", "")
     else throw new IllegalStateException("Only objects can extend Table")
   }
 
-  def deriveSchemaName(o: AnyRef) = {
-    if (o.getClass().getSimpleName().endsWith("$"))
-      this.getClass.getSimpleName.replaceAll("\\$", "")
-    else throw new IllegalStateException("Only objects can extend Schema")
+  def deriveSchemaName(o: Schema) = {
+    if (o.getClass().getSimpleName() == "package$")
+      o.getClass.getPackage.getName.split("\\.").last
+    else throw new IllegalStateException("Only package objects can extend Schema")
   }
-  def deriveCatalogName(o: AnyRef) = {
+  def deriveCatalogName(o: Catalog) = {
     if (o.getClass().getSimpleName() == "package$")
       o.getClass.getPackage.getName.split("\\.").last
     else throw new IllegalStateException("Only package objects can extend  Catalog")

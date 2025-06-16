@@ -6,15 +6,19 @@ abstract class Table(implicit _schema: Schema) extends UnityObject("Table") {
   self: Origin =>
   val catalog = _schema.catalog
   val schema = _schema
-  lazy val name = UnityObject.deriveTableName(this)
+  val name = UnityObject.deriveTableName(this)
 
-  lazy val unityPath = s"${schema.unityPath}.$name"
+  val unityPath = s"${schema.unityPath}.$name"
 
   // val automaticMetaColumn: Boolean = true
 
   val keys: Seq[(String, ColType)]
   val values: Seq[(String, ColType)]
 
+}
+
+abstract class SRTable(implicit _schema: Schema) extends Table() with Origin.Loaded {
+  override val name = UnityObject.deriveTableName(this).toLowerCase()
 }
 
 /*

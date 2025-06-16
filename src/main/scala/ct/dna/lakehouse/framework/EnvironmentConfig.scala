@@ -3,7 +3,6 @@ package ct.dna.lakehouse.framework
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
-import ct.dna.lakehouse.metastore.Table
 import ct.dna.lakehouse.framework.EnvironmentConfig.Lakehouse
 import ct.dna.lakehouse.framework.EnvironmentConfig.RemoteSandbox
 import ct.dna.lakehouse.framework.EnvironmentConfig.Sandbox

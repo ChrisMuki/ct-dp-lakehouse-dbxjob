@@ -1,11 +1,10 @@
 package ct.dna.lakehouse.catalogs.sr.showcase
 
 import ct.dna.lakehouse.metastore.LongType
+import ct.dna.lakehouse.metastore.SRTable
 import ct.dna.lakehouse.metastore.StringType
-import ct.dna.lakehouse.metastore.Table
-import ct.dna.lakehouse.transformations.Origin
 
-object Orders extends Table with Origin.Loaded {
+object Orders extends SRTable {
 
   override val keys = Seq(
     ("orderid", StringType)

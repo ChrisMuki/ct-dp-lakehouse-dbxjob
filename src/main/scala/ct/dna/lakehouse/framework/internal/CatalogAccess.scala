@@ -1,13 +1,10 @@
 package ct.dna.lakehouse.framework.internal
-
-import org.apache.spark.sql.SparkSession
-import ct.dna.lakehouse.framework.EnvironmentConfig
-import ct.dna.lakehouse.metastore.Table
 import ct.dna.lakehouse.Environment
 import ct.dna.lakehouse.framework.EnvironmentConfig.Lakehouse
 import ct.dna.lakehouse.framework.EnvironmentConfig.RemoteSandbox
 import ct.dna.lakehouse.framework.EnvironmentConfig.Sandbox
 import ct.dna.lakehouse.framework.EnvironmentConfig.Staging
+import ct.dna.lakehouse.metastore.Table
 
 sealed trait CatalogAccess {
   def target_fqtn(tableDef: Table): String

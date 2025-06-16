@@ -2,7 +2,6 @@ package ct.dna.lakehouse.framework.internal
 
 import java.sql.Timestamp
 
-import ct.dna.lakehouse.metastore.Table
 import ct.dna.lakehouse.framework.ChangeFeedVersion
 import ct.dna.lakehouse.framework.DeltaHistory
 import ct.dna.lakehouse.framework.DeltaHistory.INGDeltaHistory
@@ -10,6 +9,7 @@ import ct.dna.lakehouse.framework.DeltaHistory.LakehouseDeltaHistory
 import ct.dna.lakehouse.framework.DeltaHistory.SimpleDeltaHistory
 import ct.dna.lakehouse.framework.EnvironmentConfig
 import ct.dna.lakehouse.framework.UserMetadata.LakehouseMetadata
+import ct.dna.lakehouse.metastore.Table
 import ct.dna.lakehouse.transformations.ChangeFeedTable
 import ct.dna.lakehouse.transformations.Origin
 import ct.dna.lakehouse.transformations.Origin.Transformation
@@ -22,7 +22,6 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.LongType
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.types.TimestampType
-import ct.dna.lakehouse.Environment
 case class TransformationExecutor(environment: EnvironmentConfig) extends LoggingTrait {
 
   private val spark: SparkSession = SparkBuilder.newSession()

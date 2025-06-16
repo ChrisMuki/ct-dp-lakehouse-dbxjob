@@ -1,12 +1,13 @@
 package ct.dna.lakehouse.framework.internal
 
-import org.apache.spark.sql.SparkSession
 import ct.dna.lakehouse.Environment
 import ct.dna.lakehouse.framework.EnvironmentConfig._
 import ct.dna.utils.LoggingTrait
+import org.apache.spark.sql.SparkSession
 
 private[internal] object SparkBuilder extends LoggingTrait {
 
+  def newSession() = activeSession.newSession()
   private lazy val activeSession: SparkSession = {
 
     val builder = SparkSession.builder()
@@ -27,6 +28,4 @@ private[internal] object SparkBuilder extends LoggingTrait {
     }
     setEnvConfig(builder).getOrCreate()
   }
-
-  def newSession() = activeSession.newSession()
 }

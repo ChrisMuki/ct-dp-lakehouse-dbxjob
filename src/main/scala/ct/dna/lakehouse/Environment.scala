@@ -1,17 +1,8 @@
 package ct.dna.lakehouse
-
 import ct.dna.lakehouse.framework.EnvironmentConfig
-import ct.dna.utils.json.mapper
 import ct.dna.utils.Configuration
 import ct.dna.utils.LoggingTrait
-
-import org.apache.spark.sql.SparkSession
-import ct.dna.utils.Configuration
-import ct.dna.lakehouse.metastore.Table
 import ct.dna.utils.json.mapper
-import ct.dna.utils.LoggingTrait
-import ct.dna.lakehouse.framework.internal.CatalogAccess
-import ct.dna.lakehouse.framework.EnvironmentConfig
 
 object Environment extends LoggingTrait {
   private var initArgs: Option[Array[String]] = None

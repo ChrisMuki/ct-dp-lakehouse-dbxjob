@@ -2,13 +2,20 @@ package ct.dna.lakehouse.framework
 
 import ct.dna.dp.datastore.ColumnContract
 import ct.dna.dp.datastore.TableContract
-import ct.dna.lakehouse.metastore.{Table, ColType}
+import ct.dna.lakehouse.metastore.ColType
+import ct.dna.lakehouse.metastore.Table
 
 object Contract {
   def validateTable(table: Table): Unit = {
-    assert(TableContract.sanitize(table.name.toLowerCase()) == table.name.toLowerCase())
-    assert(TableContract.sanitize(table.schema.name.toLowerCase()) == table.schema.name.toLowerCase())
-    assert(TableContract.sanitize(table.schema.catalog.name.toLowerCase()) == table.schema.catalog.name.toLowerCase())
+    assert(
+      TableContract.sanitize(table.name.toLowerCase()) == table.name.toLowerCase(),
+      s"table name not valid: found '${table.name}'"
+    )
+    assert(TableContract.sanitize(table.schema.name.toLowerCase()) == table.schema.name.toLowerCase(), s"schema name not valid: found '${table.schema.name}'")
+    assert(
+      TableContract.sanitize(table.schema.catalog.name.toLowerCase()) == table.schema.catalog.name.toLowerCase(),
+      s"catalog name not valid: found '${table.schema.catalog.name}'"
+    )
     validateColumns(table.keys, false)
     validateColumns(table.values, false)
   }
@@ -18,14 +25,14 @@ object Contract {
       (Actual(name), Lower(name.toLowerCase()), LowerSanitized(ColumnContract.sanitize(name.toLowerCase, areMetaColumns)), ct)
     }
 
-    val ambigousNames = extendedColumns.groupBy(_._2).filter(_._2.size > 0)
-    assert(ambigousNames.isEmpty)
+    val ambigousNames = extendedColumns.groupBy(_._2).filter(_._2.size > 1)
+    assert(ambigousNames.isEmpty, s"Found ambigousNames ${ambigousNames}")
 
     val uncompliantNames = extendedColumns.filter(t => t._2.lower != t._3.lowerSanitized)
-    assert(uncompliantNames.isEmpty)
+    assert(uncompliantNames.isEmpty, s"Found uncompliantNames ${uncompliantNames}")
 
     val reservedNames = extendedColumns.filter(t => reservedColumnNames.contains(t._2.lower))
-    assert(reservedNames.isEmpty)
+    assert(reservedNames.isEmpty, s"Found reservedNames ${reservedNames}")
   }
   private case class Actual(actual: String) extends AnyVal
   private case class Lower(lower: String) extends AnyVal

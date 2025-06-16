@@ -3,7 +3,6 @@ import ct.dna.lakehouse.framework.MergeBuilder
 import ct.dna.lakehouse.framework.UserMetadata.LakehouseMetadata
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.DataFrame
-import com.fasterxml.jackson.module.scala.deser.overrides
 
 trait TargetTable {
   def as(alias: String): TargetTable

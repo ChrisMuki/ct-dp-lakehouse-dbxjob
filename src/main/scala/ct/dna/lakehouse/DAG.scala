@@ -1,14 +1,18 @@
 package ct.dna.lakehouse
 
-import io.github.classgraph.ClassGraph
-import ct.dna.lakehouse.metastore.UnityObject
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters.ListHasAsScala
+import scala.util.Try
+
+import ct.dna.lakehouse.framework.Contract.validateTable
 import ct.dna.lakehouse.metastore.Catalog
 import ct.dna.lakehouse.metastore.Schema
 import ct.dna.lakehouse.metastore.Table
-import ct.dna.lakehouse.transformations.Origin.Transformation
-import scala.jdk.CollectionConverters.ListHasAsScala
-import ct.dna.lakehouse.framework.Contract.validateTable
+import ct.dna.lakehouse.metastore.UnityObject
+import ct.dna.lakehouse.transformations.Origin
+import io.github.classgraph.ClassGraph
 object DAG {
+  // WIP
 
   lazy val dag = {
     val scanResult = new ClassGraph()
@@ -17,11 +21,20 @@ object DAG {
       .scan()
 
     def findObjects[T](interfaceClass: Class[T]) = {
-      scanResult
-        .getClassesImplementing(interfaceClass)
+      val clazzes = Try(
+        scanResult
+          .getSubclasses(interfaceClass)
+          .loadClasses()
+          .asScala
+      ).getOrElse(ArrayBuffer.empty) ++ Try(
+        scanResult
+          .getClassesImplementing(interfaceClass)
+          .loadClasses()
+          .asScala
+      ).getOrElse(ArrayBuffer.empty)
+
+      clazzes
         .filter(_.getName().endsWith("$"))
-        .loadClasses()
-        .asScala
         .map(cls => {
           val clazz = Class.forName(cls.getName)
           val moduleField = clazz.getField("MODULE$")
@@ -40,9 +53,8 @@ object DAG {
     val allTables = findObjects(classOf[Table])
     assert(allTables.filterNot(t => allSchemas.contains(t.schema)).isEmpty)
 
-    val allTransformations = findObjects(classOf[Transformation])
-    assert((allTransformations.map(_.table) -- allTables).isEmpty)
-    assert(allTransformations.size == allTables.size)
+    val allTransformations = findObjects(classOf[Origin])
+    assert(allTransformations.map(_.table) == allTables)
 
     allTables.foreach(validateTable)
 
