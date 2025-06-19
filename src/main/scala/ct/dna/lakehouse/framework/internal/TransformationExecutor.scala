@@ -1,7 +1,11 @@
 package ct.dna.lakehouse.framework.internal
 import ct.dna.lakehouse.framework.EnvironmentConfig
+import ct.dna.lakehouse.framework.internal.implicits.SparkExtensions
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
+import ct.dna.lakehouse.framework.internal.transformations.ChangeFeedTableImpl
+import ct.dna.lakehouse.framework.internal.transformations.SnapshotTableImpl
+import ct.dna.lakehouse.framework.internal.transformations.TargetTableImpl
 import ct.dna.lakehouse.metastore.Table
 import ct.dna.lakehouse.transformations.ChangeFeedTable
 import ct.dna.lakehouse.transformations.Commit
@@ -13,7 +17,7 @@ import io.delta.tables.DeltaTable
 import org.apache.spark.sql.SparkSession
 private[internal] case class TransformationExecutor(environment: EnvironmentConfig) extends LoggingTrait {
 
-  private val spark: SparkSession = SparkBuilder.newSession()
+  private val spark: SparkSession = SparkSessionHandler.newSession()
 
   spark.udf.register(Row_lh_framework.udfName, Row_lh_framework.metadataUDF)
 
@@ -51,7 +55,7 @@ private[internal] case class TransformationExecutor(environment: EnvironmentConf
     val newChangeFeedVersions = cfTables.values.map(cft => (cft.fqtn, cft.version)).toMap
     val new_lh_framework = Row_lh_framework(
       last_lh_framework.changeFeedVersions ++ newChangeFeedVersions,
-      TargetTable.Version(init = newInitCommit, used = lastCommit)
+      TargetTable.Version(init = newInitCommit, last = lastCommit)
     )
 
     val targetTable = TargetTableImpl(spark.implicits, target_fqtn, targetDeltaTable, last_lh_framework, new_lh_framework)
@@ -87,7 +91,7 @@ private[internal] case class TransformationExecutor(environment: EnvironmentConf
         ChangeFeedTable.Version(knownVersion.init, currentCommit),
         false
       )
-    } else if (knownVersion.current.version >= earliestUsableCommit.version) {
+    } else if (knownVersion.current.version >= earliestUsableCommit.version && !knownVersion.current.timeStamp.before(earliestUsableCommit.timeStamp)) {
       // here we can process CDF correct
       ChangeFeedTableImpl(
         spark.implicits,

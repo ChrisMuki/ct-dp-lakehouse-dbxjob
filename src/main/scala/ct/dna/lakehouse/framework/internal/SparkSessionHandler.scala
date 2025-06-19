@@ -5,7 +5,7 @@ import ct.dna.lakehouse.framework.EnvironmentConfig._
 import ct.dna.utils.LoggingTrait
 import org.apache.spark.sql.SparkSession
 
-private[internal] object SparkBuilder extends LoggingTrait {
+private[internal] object SparkSessionHandler extends LoggingTrait {
 
   def newSession() = activeSession.newSession()
 

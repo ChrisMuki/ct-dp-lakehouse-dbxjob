@@ -4,7 +4,7 @@ import org.apache.spark.sql.Column
 import org.apache.spark.sql.DataFrame
 
 object TargetTable {
-  case class Version(init: Commit, used: Commit)
+  case class Version(init: Commit, last: Commit)
 }
 
 trait TargetTable {

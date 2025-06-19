@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.framework.internal
+package ct.dna.lakehouse.framework.internal.transformations
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{columnName => _lh_framework}
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{udfName => update_lh_framework}
@@ -51,7 +51,7 @@ private[internal] case class TargetTableImpl(
       )
       .whenMatched(source__lh_meta.isNull and target__lh_meta.isNull)
       .update(
-        Map(_lh_framework -> expr(s"$update_lh_framework(${alias}.${_lh_framework}),${sourceAlias}.${_lh_framework},'$last_lh_framework'"))
+        Map(_lh_framework -> expr(s"$update_lh_framework(${alias}.${_lh_framework}),${sourceAlias}.${_lh_framework},'${last_lh_framework.asValue}'"))
       )
   }
 

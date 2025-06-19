@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.framework.internal
+package ct.dna.lakehouse.framework.internal.transformations
 import scala.collection.immutable.ArraySeq
 
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{columnName => _lh_framework}

@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.framework.internal
+package ct.dna.lakehouse.framework.internal.transformations
 
 import ct.dna.lakehouse.transformations.ChangeFeedTable
 import ct.dna.lakehouse.transformations.SnapshotTable

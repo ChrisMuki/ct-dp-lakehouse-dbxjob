@@ -1,9 +1,13 @@
-package ct.dna.lakehouse.framework
+package ct.dna.lakehouse.framework.internal
 
 import java.sql.Timestamp
 
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
+import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.INGEST
+import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.MERGE
+import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.OPTIMIZE
+import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.STRUCTURE_CHANGE
 import ct.dna.lakehouse.transformations.Commit
 import ct.dna.utils.LoggingTrait
 import io.delta.tables.DeltaTable
@@ -14,12 +18,7 @@ import org.apache.spark.sql.types.LongType
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.types.TimestampType
 
-package object internal extends LoggingTrait {
-
-  import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.INGEST
-  import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.MERGE
-  import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.OPTIMIZE
-  import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.STRUCTURE_CHANGE
+object implicits extends LoggingTrait {
 
   private[internal] implicit class SparkExtensions(spark: SparkSession) {
     def setUserMetadata(userMetadata: UserMetadata): Unit =
@@ -62,7 +61,7 @@ package object internal extends LoggingTrait {
       val r = DeltaTable
         .forName(spark, fqtn)
         .history()
-        .filter(s"version >= ${known.version}")
+        // .filter(s"version >= ${known.version}")
         .agg(
           min(struct("version", "timestamp")).as("__from"),
           max(when(col("userMetadata").startsWith(UserMetadata.STRUCTURE_CHANGE.prefix), struct("version", "timestamp"))).as("__structure_change"),
