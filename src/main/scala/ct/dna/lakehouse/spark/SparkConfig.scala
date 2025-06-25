@@ -1,12 +1,12 @@
-package ct.dna.lakehouse.framework
+package ct.dna.lakehouse.spark
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
-import ct.dna.lakehouse.framework.EnvironmentConfig.Lakehouse
-import ct.dna.lakehouse.framework.EnvironmentConfig.RemoteSandbox
-import ct.dna.lakehouse.framework.EnvironmentConfig.Sandbox
-import ct.dna.lakehouse.framework.EnvironmentConfig.Staging
+import ct.dna.lakehouse.spark.SparkConfig.Lakehouse
+import ct.dna.lakehouse.spark.SparkConfig.RemoteSandbox
+import ct.dna.lakehouse.spark.SparkConfig.Sandbox
+import ct.dna.lakehouse.spark.SparkConfig.Staging
 import ct.dna.utils.json.serializer.{TypedProductSerializer => TPS}
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "clazz")
@@ -19,11 +19,11 @@ import ct.dna.utils.json.serializer.{TypedProductSerializer => TPS}
     new JsonSubTypes.Type(value = classOf[RemoteSandbox], name = "RemoteSandbox")
   )
 )
-sealed trait EnvironmentConfig
-object EnvironmentConfig {
+sealed trait SparkConfig
+object SparkConfig {
   @JsonSerialize(using = classOf[TPS]) final case class RemoteSandbox(stage: String, uid: String, workspaceUrl: String, clusterId: String, pat: String)
-      extends EnvironmentConfig
-  @JsonSerialize(using = classOf[TPS]) final case class Sandbox(stage: String, uid: String) extends EnvironmentConfig
-  @JsonSerialize(using = classOf[TPS]) final case class Staging(stage: String) extends EnvironmentConfig
-  @JsonSerialize(using = classOf[TPS]) final case class Lakehouse(stage: String) extends EnvironmentConfig
+      extends SparkConfig
+  @JsonSerialize(using = classOf[TPS]) final case class Sandbox(stage: String, uid: String) extends SparkConfig
+  @JsonSerialize(using = classOf[TPS]) final case class Staging(stage: String) extends SparkConfig
+  @JsonSerialize(using = classOf[TPS]) final case class Lakehouse(stage: String) extends SparkConfig
 }

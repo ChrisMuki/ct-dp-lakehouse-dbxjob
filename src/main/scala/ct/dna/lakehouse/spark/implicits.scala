@@ -1,4 +1,4 @@
-package ct.dna.lakehouse
+package ct.dna.lakehouse.spark
 import scala.collection.immutable.ArraySeq
 
 import org.apache.spark.sql.Column

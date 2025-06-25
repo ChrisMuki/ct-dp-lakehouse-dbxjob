@@ -1,5 +1,5 @@
 package ct.dna.lakehouse.framework.internal
-import ct.dna.lakehouse.framework.EnvironmentConfig
+import ct.dna.lakehouse.spark.SparkConfig
 import ct.dna.lakehouse.framework.internal.implicits.SparkExtensions
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
@@ -15,7 +15,7 @@ import ct.dna.lakehouse.transformations.TargetTable
 import ct.dna.utils.LoggingTrait
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.SparkSession
-private[internal] case class TransformationExecutor(environment: EnvironmentConfig) extends LoggingTrait {
+private[internal] case class TransformationExecutor(environment: SparkConfig) extends LoggingTrait {
 
   private val spark: SparkSession = SparkSessionHandler.newSession()
 
@@ -79,7 +79,7 @@ private[internal] case class TransformationExecutor(environment: EnvironmentConf
     val source_fqtn = CatalogAccess.source_fqtn(cFDef)
     val knownVersion = sourceVersions.get(source_fqtn).getOrElse(ChangeFeedTable.Version(Commit(-1, null), Commit(-1, null)))
 
-    val (earliestUsableCommit, currentCommit) = spark.readChangeFeedVersionAfter(source_fqtn, knownVersion.current)
+    val (knownOrLater, currentCommit) = spark.readChangeFeedVersionAfter(source_fqtn, knownVersion.current)
     if (knownVersion.current.version == currentCommit.version) {
       // nothing has changed at all
       ChangeFeedTableImpl(
@@ -91,7 +91,7 @@ private[internal] case class TransformationExecutor(environment: EnvironmentConf
         ChangeFeedTable.Version(knownVersion.init, currentCommit),
         false
       )
-    } else if (knownVersion.current.version >= earliestUsableCommit.version && !knownVersion.current.timeStamp.before(earliestUsableCommit.timeStamp)) {
+    } else if (knownVersion.current.version == knownOrLater.version && knownVersion.current.timeStamp.equals(knownOrLater.timeStamp)) {
       // here we can process CDF correct
       ChangeFeedTableImpl(
         spark.implicits,
@@ -109,8 +109,8 @@ private[internal] case class TransformationExecutor(environment: EnvironmentConf
         cFDef.keys.map(t => t._1),
         source_fqtn,
         spark.readDF(source_fqtn, currentCommit.version),
-        spark.initCDF(source_fqtn, earliestUsableCommit, currentCommit.version),
-        ChangeFeedTable.Version(earliestUsableCommit, currentCommit),
+        spark.initCDF(source_fqtn, knownOrLater, currentCommit.version),
+        ChangeFeedTable.Version(knownOrLater, currentCommit),
         true
       )
 

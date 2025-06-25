@@ -1,7 +1,7 @@
 package ct.dna.lakehouse.framework.internal
 
 import ct.dna.lakehouse.Environment
-import ct.dna.lakehouse.framework.EnvironmentConfig._
+import ct.dna.lakehouse.spark.SparkConfig._
 import ct.dna.utils.LoggingTrait
 import org.apache.spark.sql.SparkSession
 

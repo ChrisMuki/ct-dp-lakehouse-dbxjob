@@ -1,9 +1,9 @@
 package ct.dna.lakehouse.framework.internal
 import ct.dna.lakehouse.Environment
-import ct.dna.lakehouse.framework.EnvironmentConfig.Lakehouse
-import ct.dna.lakehouse.framework.EnvironmentConfig.RemoteSandbox
-import ct.dna.lakehouse.framework.EnvironmentConfig.Sandbox
-import ct.dna.lakehouse.framework.EnvironmentConfig.Staging
+import ct.dna.lakehouse.spark.SparkConfig.Lakehouse
+import ct.dna.lakehouse.spark.SparkConfig.RemoteSandbox
+import ct.dna.lakehouse.spark.SparkConfig.Sandbox
+import ct.dna.lakehouse.spark.SparkConfig.Staging
 import ct.dna.lakehouse.metastore.Table
 
 sealed trait CatalogAccess {

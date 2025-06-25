@@ -1,5 +1,5 @@
 package ct.dna.lakehouse
-import ct.dna.lakehouse.framework.EnvironmentConfig
+import ct.dna.lakehouse.spark.SparkConfig
 import ct.dna.utils.Configuration
 import ct.dna.utils.LoggingTrait
 import ct.dna.utils.json.mapper
@@ -10,8 +10,8 @@ object Environment extends LoggingTrait {
 
   def initializeAndValidate(): Unit = activeConfig
 
-  lazy val activeConfig: EnvironmentConfig = {
-    Configuration.required("EnvironmentConfig").initializeAndValidate(Array.empty)
-    mapper.readValue[EnvironmentConfig](Configuration.getProperty("EnvironmentConfig"))
+  lazy val activeConfig: SparkConfig = {
+    Configuration.required("SparkConfig").initializeAndValidate(Array.empty)
+    mapper.readValue[SparkConfig](Configuration.getProperty("SparkConfig"))
   }
 }

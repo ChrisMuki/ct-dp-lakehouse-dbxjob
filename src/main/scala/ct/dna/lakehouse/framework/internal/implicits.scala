@@ -40,7 +40,7 @@ object implicits extends LoggingTrait {
         case OPTIMIZE => {
           val nonOptimizeRow = targetDeltaTable
             .history()
-            .filter(s"version <= ${lastTargetCommit.version}")
+            // .filter(s"version <= ${lastTargetCommit.version}")
             .agg(max(when(!col("userMetadata").startsWith(UserMetadata.OPTIMIZE.prefix), struct("version", "timestamp", "userMetadata"))).as("__agg"))
             .select("__agg.*")
             .first()
@@ -58,27 +58,37 @@ object implicits extends LoggingTrait {
     }
 
     def readChangeFeedVersionAfter(fqtn: String, known: Commit): (Commit, Commit) = {
-      val r = DeltaTable
-        .forName(spark, fqtn)
-        .history()
-        // .filter(s"version >= ${known.version}")
-        .agg(
-          min(struct("version", "timestamp")).as("__from"),
-          max(when(col("userMetadata").startsWith(UserMetadata.STRUCTURE_CHANGE.prefix), struct("version", "timestamp"))).as("__structure_change"),
-          max(struct("version", "timestamp")).as("__to"),
-          max(when(!col("userMetadata").startsWith(UserMetadata.OPTIMIZE.prefix), struct("version", "timestamp"))).as("__nonOptimize")
-        )
-        .first()
-      if (r.getAs[Row]("__structure_change") == null)
-        (
-          Commit(r.getAs[Long]("__from.version"), r.getAs[Timestamp]("__from.timestamp")),
-          Commit(r.getAs[Long]("__to.version"), r.getAs[Timestamp]("__to.timestamp"))
-        )
-      else
-        (
-          Commit(r.getAs[Long]("__structure_change.version"), r.getAs[Timestamp]("__structure_change.timestamp")),
-          Commit(r.getAs[Long]("__to.version"), r.getAs[Timestamp]("__to.timestamp"))
-        )
+      val df =
+        DeltaTable
+          .forName(spark, fqtn)
+          .history()
+          .filter(s"version >= ${known.version}")
+          .agg(
+            min(struct("version", "timestamp")).as("__from"),
+            max(when(col("userMetadata").startsWith(UserMetadata.STRUCTURE_CHANGE.prefix), struct("version", "timestamp"))).as("__structure_change"),
+            max(struct("version", "timestamp")).as("__to"),
+            max(when(!col("userMetadata").startsWith(UserMetadata.OPTIMIZE.prefix), struct("version", "timestamp"))).as("__nonOptimize")
+          )
+      if (df.count() > 0) {
+        val r = df.first()
+        if (r.getAs[Row]("__structure_change") == null)
+          (
+            Commit(r.getAs[Long]("__from.version"), r.getAs[Timestamp]("__from.timestamp")),
+            Commit(r.getAs[Long]("__to.version"), r.getAs[Timestamp]("__to.timestamp"))
+          )
+        else
+          (
+            Commit(r.getAs[Long]("__structure_change.version"), r.getAs[Timestamp]("__structure_change.timestamp")),
+            Commit(r.getAs[Long]("__to.version"), r.getAs[Timestamp]("__to.timestamp"))
+          )
+      } else {
+        val r = DeltaTable
+          .forName(spark, fqtn)
+          .history(1)
+          .first()
+        val c = Commit(r.getAs[Long]("version"), r.getAs[Timestamp]("timestamp"))
+        (c, c)
+      }
     }
 
     //   def readLastDeltaHistory(fqtn: String): DeltaHistory = parseDeltaHistory(

@@ -6,7 +6,7 @@
         "com.azure.data.tables.TableClient_ResourceNotFound": "FATAL"
     },
     "LogTime": "false",
-    "EnvironmentConfig": {
+    "SparkConfig": {
         "stage": "dev",
         "clazz": "RemoteSandbox",
         "uid": "uia00402",
