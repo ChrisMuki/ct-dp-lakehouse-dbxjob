@@ -1,0 +1,7 @@
+{
+  "id": "coursier",
+  "version": "1.0.0",
+  "name": "Coursier launcher",
+  "description": "Installs Coursier.",
+  "installsAfter": [  "./dbx-env-setup" ]
+}

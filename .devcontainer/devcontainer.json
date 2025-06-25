@@ -1,0 +1,42 @@
+{
+  "name": "Feature-based Devcontainer with common-utils",
+  "image": "common-docker-r.artifactory.geo.conti.de/ubuntu:22.04",
+
+  "overrideFeatureInstallOrder": [
+    "./features/conti-ca-certificates",
+    "./features/dbx-env-setup",
+    "./features/azure-cli",
+    "./features/databricks-cli",
+    "./features/coursier",
+    "./features/java-17-setup",
+    "./features/zsh-hints"
+  ],
+  "features": {
+    "./features/dbx-env-setup": {
+      "installGit": true,
+      "configureZshAsDefaultShell": true,
+      "username": "sparkdev"
+    },
+    "./features/conti-ca-certificates": {},
+    "./features/azure-cli": {},
+    "./features/databricks-cli": {},
+    "./features/coursier": {},
+    "./features/java-17-setup": {},
+    "./features/zsh-hints": {}
+  },
+  "remoteUser": "sparkdev",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "scalameta.metals",
+        "mhutchie.git-graph"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "metals.buildServer": "sbt"
+      }
+    }
+  },
+  "postCreateCommand": "(sbt compile || true) && echo 'Devcontainer setup completed'",
+  "mounts": []
+}

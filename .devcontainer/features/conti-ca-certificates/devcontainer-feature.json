@@ -1,0 +1,8 @@
+{
+  "id": "conti-ca-certificates",
+  "version": "0.0.1",
+  "name": "Conti CA Certificates",
+  "description": "Installiert drei interne Conti‑CA‑Zertifikate ins System‑Truststore!",
+  "entrypoint": "install.sh",
+  "installsAfter": []
+}
