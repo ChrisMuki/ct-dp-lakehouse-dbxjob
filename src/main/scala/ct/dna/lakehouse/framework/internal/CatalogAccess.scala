@@ -1,10 +1,10 @@
 package ct.dna.lakehouse.framework.internal
 import ct.dna.lakehouse.Environment
+import ct.dna.lakehouse.metastore.Table
 import ct.dna.lakehouse.spark.SparkConfig.Lakehouse
 import ct.dna.lakehouse.spark.SparkConfig.RemoteSandbox
 import ct.dna.lakehouse.spark.SparkConfig.Sandbox
 import ct.dna.lakehouse.spark.SparkConfig.Staging
-import ct.dna.lakehouse.metastore.Table
 
 sealed trait CatalogAccess {
   def target_fqtn(tableDef: Table): String

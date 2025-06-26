@@ -31,8 +31,6 @@ lazy val root = project
       // For DAG
       "io.github.classgraph" % "classgraph" % "4.8.179",
 
-      
-
       // Required Test libraries
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )

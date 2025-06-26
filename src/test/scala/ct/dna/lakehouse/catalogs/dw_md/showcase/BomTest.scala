@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.catalog.dw_md.showcase
+package ct.dna.lakehouse.catalogs.dw_md.showcase
 
 import ct.dna.lakehouse.TestSuiteWithEnvironment
 
