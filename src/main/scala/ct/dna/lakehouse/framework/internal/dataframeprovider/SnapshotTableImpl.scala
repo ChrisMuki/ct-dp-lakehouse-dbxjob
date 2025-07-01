@@ -1,7 +1,7 @@
-package ct.dna.lakehouse.framework.internal.transformations
+package ct.dna.lakehouse.framework.internal.dataframeprovider
 
-import ct.dna.lakehouse.transformations.ChangeFeedTable
-import ct.dna.lakehouse.transformations.SnapshotTable
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
+import ct.dna.lakehouse.dataframeprovider.SnapshotTable
 import org.apache.spark.sql.DataFrame
 private[internal] case class SnapshotTableImpl(changeFeedTable: ChangeFeedTable) extends SnapshotTable {
   val fqtn: String = changeFeedTable.fqtn

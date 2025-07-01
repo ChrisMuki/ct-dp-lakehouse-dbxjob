@@ -1,5 +1,5 @@
 package ct.dna.lakehouse.catalogs
 
-import ct.dna.lakehouse.metastore.Catalog
+import ct.dna.lakehouse.metastore.CatalogDef
 
-package object dw_md extends Catalog
+package object dw_md extends CatalogDef

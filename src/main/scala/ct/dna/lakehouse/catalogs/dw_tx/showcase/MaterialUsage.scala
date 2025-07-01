@@ -1,22 +1,22 @@
 package ct.dna.lakehouse.catalogs.dw_tx.showcase
 
 import ct.dna.lakehouse.catalogs._
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
+import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.lakehouse.metastore.LongType
+import ct.dna.lakehouse.metastore.Origin
 import ct.dna.lakehouse.metastore.StringType
-import ct.dna.lakehouse.metastore.Table
-import ct.dna.lakehouse.transformations.ChangeFeedTable
-import ct.dna.lakehouse.transformations.Origin
-import ct.dna.lakehouse.transformations.TargetTable
+import ct.dna.lakehouse.metastore.TableDef
 import org.apache.spark.sql.SQLImplicits
 import org.apache.spark.sql.functions._
 
-object MaterialUsage extends Table with Origin.OneTransaction {
+object MaterialUsage extends TableDef with Origin.OneTransaction {
 
   override val keys = Seq(("Material", StringType))
   override val values = Seq(("Amount", LongType))
-  override val changeFeeds: Seq[Table] = Seq(dw_tx.showcase.MaterialUsageDetails)
+  override val changeFeeds: Seq[TableDef] = Seq(dw_tx.showcase.MaterialUsageDetails)
 
-  override def executeTransaction(implicits: SQLImplicits, target: TargetTable, changeFeeds: Map[Table, ChangeFeedTable]): Boolean = {
+  override def executeTransaction(implicits: SQLImplicits, target: TargetTable, changeFeeds: Map[TableDef, ChangeFeedTable]): Boolean = {
 
     import implicits._
     val source = changeFeeds(dw_tx.showcase.MaterialUsageDetails)

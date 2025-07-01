@@ -1,11 +1,11 @@
 package ct.dna.lakehouse
 import ct.dna.lakehouse.catalogs.testOnly
-import ct.dna.lakehouse.metastore.Table
+import ct.dna.lakehouse.metastore.TableDef
 import org.apache.spark.sql.DataFrame
 
 class ReadXLSXTest extends TestSuiteWithEnvironment {
 
-  def read(p: String, t: Table): DataFrame = ???
+  def read(p: String, t: TableDef): DataFrame = ???
 
   "My TestDataReader" should "read a xlsx for sr.showcase.BOM" in {
 

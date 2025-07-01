@@ -2,13 +2,13 @@ package ct.dna.lakehouse.framework.internal
 
 import java.sql.Timestamp
 
+import ct.dna.lakehouse.dataframeprovider.Commit
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.INGEST
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.MERGE
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.OPTIMIZE
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.STRUCTURE_CHANGE
-import ct.dna.lakehouse.transformations.Commit
 import ct.dna.utils.LoggingTrait
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.Row

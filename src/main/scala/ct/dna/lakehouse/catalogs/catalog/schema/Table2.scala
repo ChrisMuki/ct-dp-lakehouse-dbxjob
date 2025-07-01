@@ -1,10 +1,10 @@
 package ct.dna.lakehouse.catalogs.catalog.schema
 
+import ct.dna.lakehouse.metastore.Origin
 import ct.dna.lakehouse.metastore.StringType
-import ct.dna.lakehouse.metastore.Table
-import ct.dna.lakehouse.transformations.Origin
+import ct.dna.lakehouse.metastore.TableDef
 
-object Table2 extends Table() with Origin.Loaded {
+object Table2 extends TableDef() with Origin.Loaded {
 
   val keys = Seq(
     ("id", StringType)

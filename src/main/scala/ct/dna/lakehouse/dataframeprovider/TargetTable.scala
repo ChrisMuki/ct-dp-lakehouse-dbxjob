@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.transformations
+package ct.dna.lakehouse.dataframeprovider
 import io.delta.tables.DeltaMergeBuilder
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.DataFrame

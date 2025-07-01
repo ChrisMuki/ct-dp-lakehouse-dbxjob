@@ -1,17 +1,17 @@
 package ct.dna.lakehouse.framework.internal
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
+import ct.dna.lakehouse.dataframeprovider.Commit
+import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.lakehouse.framework.internal.implicits.SparkExtensions
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
-import ct.dna.lakehouse.framework.internal.transformations.ChangeFeedTableImpl
-import ct.dna.lakehouse.framework.internal.transformations.SnapshotTableImpl
-import ct.dna.lakehouse.framework.internal.transformations.TargetTableImpl
-import ct.dna.lakehouse.metastore.Table
+import ct.dna.lakehouse.framework.internal.dataframeprovider.ChangeFeedTableImpl
+import ct.dna.lakehouse.framework.internal.dataframeprovider.SnapshotTableImpl
+import ct.dna.lakehouse.framework.internal.dataframeprovider.TargetTableImpl
+import ct.dna.lakehouse.metastore.Origin
+import ct.dna.lakehouse.metastore.Origin.Transformation
+import ct.dna.lakehouse.metastore.TableDef
 import ct.dna.lakehouse.spark.SparkConfig
-import ct.dna.lakehouse.transformations.ChangeFeedTable
-import ct.dna.lakehouse.transformations.Commit
-import ct.dna.lakehouse.transformations.Origin
-import ct.dna.lakehouse.transformations.Origin.Transformation
-import ct.dna.lakehouse.transformations.TargetTable
 import ct.dna.utils.LoggingTrait
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.SparkSession
@@ -27,23 +27,23 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
     transformation match {
       case tt: Origin.TwoTransactions => {
         logger.warn("Monitoring not integrated yet")
-        val (t1, s1) = prepareTransaction(target_fqtn, tt.changeFeedsOne)
+        val (t1, s1) = prepareDataframeProviders(target_fqtn, tt.changeFeedsOne)
         val r1 = tt.executeTransactionOne(spark.implicits, t1, s1)
         logger.warn("Monitoring not integrated yet")
-        val (t2, s2) = prepareTransaction(target_fqtn, tt.changeFeedsTwo)
+        val (t2, s2) = prepareDataframeProviders(target_fqtn, tt.changeFeedsTwo)
         val r2 = tt.executeTransactionTwo(spark.implicits, t2, s2, s1.map { case (d, st) => d -> SnapshotTableImpl(st) }) //
         logger.warn("Monitoring not integrated yet")
       }
       case tt: Origin.OneTransaction => {
         logger.warn("Monitoring not integrated yet")
-        val (t, s) = prepareTransaction(target_fqtn, tt.changeFeeds)
+        val (t, s) = prepareDataframeProviders(target_fqtn, tt.changeFeeds)
         val r = tt.executeTransaction(spark.implicits, t, s)
         logger.warn("Monitoring not integrated yet")
       }
     }
   }
 
-  def prepareTransaction(target_fqtn: String, cFDefs: Seq[Table]): (TargetTable, Map[Table, ChangeFeedTable]) = {
+  def prepareDataframeProviders(target_fqtn: String, cFDefs: Seq[TableDef]): (TargetTable, Map[TableDef, ChangeFeedTable]) = {
 
     val targetDeltaTable = DeltaTable.forName(spark, target_fqtn)
     val (lastCommit, newInitCommit, last_lh_framework) = spark.readTargetDeltaHistory(targetDeltaTable)
@@ -74,7 +74,7 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
     (targetTable, cfTables)
   }
 
-  def buildCFTable(cFDef: Table, sourceVersions: Map[String, ChangeFeedTable.Version]): ChangeFeedTable = {
+  def buildCFTable(cFDef: TableDef, sourceVersions: Map[String, ChangeFeedTable.Version]): ChangeFeedTable = {
 
     val source_fqtn = CatalogAccess.source_fqtn(cFDef)
     val knownVersion = sourceVersions.get(source_fqtn).getOrElse(ChangeFeedTable.Version(Commit(-1, null), Commit(-1, null)))

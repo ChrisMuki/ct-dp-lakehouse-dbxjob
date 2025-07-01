@@ -1,14 +1,12 @@
 package ct.dna.lakehouse.metastore
 
-import ct.dna.lakehouse.transformations.Origin
-
-abstract class Table(implicit _schema: Schema) extends UnityObject("Table") {
+abstract class TableDef(implicit _schemaDef: SchemaDef) extends UnityObject("Table") {
   self: Origin =>
-  val catalog = _schema.catalog
-  val schema = _schema
+  val catalogDef = _schemaDef.catalogDef
+  val schemaDef = _schemaDef
   val name = UnityObject.deriveTableName(this)
 
-  val unityPath = s"${schema.unityPath}.$name"
+  val unityPath = s"${schemaDef.unityPath}.$name"
 
   // val automaticMetaColumn: Boolean = true
 
@@ -17,7 +15,7 @@ abstract class Table(implicit _schema: Schema) extends UnityObject("Table") {
 
 }
 
-abstract class SRTable(implicit _schema: Schema) extends Table() with Origin.Loaded {
+abstract class SRTableDef(implicit _schema: SchemaDef) extends TableDef() with Origin.Loaded {
   override val name = UnityObject.deriveTableName(this).toLowerCase()
 }
 

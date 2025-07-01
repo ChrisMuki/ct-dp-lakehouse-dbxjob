@@ -1,8 +1,8 @@
 package ct.dna.lakehouse.framework.internal.metadata
 
-import ct.dna.lakehouse.transformations.ChangeFeedTable
-import ct.dna.lakehouse.transformations.Commit
-import ct.dna.lakehouse.transformations.TargetTable
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
+import ct.dna.lakehouse.dataframeprovider.Commit
+import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.utils.json.mapper
 
 private[internal] sealed trait UserMetadata {

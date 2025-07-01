@@ -1,15 +1,17 @@
 package ct.dna.lakehouse.catalogs.dw_md.showcase
 
 import ct.dna.lakehouse.catalogs._
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
+import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.lakehouse.metastore.LongType
+import ct.dna.lakehouse.metastore.Origin
 import ct.dna.lakehouse.metastore.StringType
-import ct.dna.lakehouse.metastore.Table
-import ct.dna.lakehouse.transformations.ChangeFeedTable
-import ct.dna.lakehouse.transformations.Origin
-import ct.dna.lakehouse.transformations.TargetTable
+import ct.dna.lakehouse.metastore.TableDef
 import org.apache.spark.sql.SQLImplicits
 
-object BOM extends Table with Origin.OneTransaction {
+case class BOM_Table(Article: String, Material: String, Amount: Long)
+
+object BOM extends TableDef with Origin.OneTransaction {
 
   override val keys = Seq(
     ("Article", StringType),
@@ -19,9 +21,9 @@ object BOM extends Table with Origin.OneTransaction {
     ("Amount", LongType)
   )
 
-  override val changeFeeds: Seq[Table] = Seq(sr.showcase.BOM)
+  override val changeFeeds: Seq[TableDef] = Seq(sr.showcase.BOM)
 
-  override def executeTransaction(implicits: SQLImplicits, target: TargetTable, changeFeeds: Map[Table, ChangeFeedTable]): Boolean = {
+  override def executeTransaction(implicits: SQLImplicits, target: TargetTable, changeFeeds: Map[TableDef, ChangeFeedTable]): Boolean = {
     val s = changeFeeds(sr.showcase.BOM)
 
     val mb = target

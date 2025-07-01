@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.transformations
+package ct.dna.lakehouse.dataframeprovider
 import org.apache.spark.sql.DataFrame
 
 object ChangeFeedTable {

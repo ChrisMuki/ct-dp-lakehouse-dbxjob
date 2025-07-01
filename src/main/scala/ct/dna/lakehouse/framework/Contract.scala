@@ -3,18 +3,21 @@ package ct.dna.lakehouse.framework
 import ct.dna.dp.datastore.ColumnContract
 import ct.dna.dp.datastore.TableContract
 import ct.dna.lakehouse.metastore.ColType
-import ct.dna.lakehouse.metastore.Table
+import ct.dna.lakehouse.metastore.TableDef
 
 object Contract {
-  def validateTable(table: Table): Unit = {
+  def validateTable(table: TableDef): Unit = {
     assert(
       TableContract.sanitize(table.name.toLowerCase()) == table.name.toLowerCase(),
       s"table name not valid: found '${table.name}'"
     )
-    assert(TableContract.sanitize(table.schema.name.toLowerCase()) == table.schema.name.toLowerCase(), s"schema name not valid: found '${table.schema.name}'")
     assert(
-      TableContract.sanitize(table.schema.catalog.name.toLowerCase()) == table.schema.catalog.name.toLowerCase(),
-      s"catalog name not valid: found '${table.schema.catalog.name}'"
+      TableContract.sanitize(table.schemaDef.name.toLowerCase()) == table.schemaDef.name.toLowerCase(),
+      s"schema name not valid: found '${table.schemaDef.name}'"
+    )
+    assert(
+      TableContract.sanitize(table.schemaDef.catalogDef.name.toLowerCase()) == table.schemaDef.catalogDef.name.toLowerCase(),
+      s"catalog name not valid: found '${table.schemaDef.catalogDef.name}'"
     )
     validateColumns(table.keys, false)
     validateColumns(table.values, false)

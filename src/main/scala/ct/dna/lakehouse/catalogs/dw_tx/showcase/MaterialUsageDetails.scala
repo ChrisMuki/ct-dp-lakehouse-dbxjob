@@ -1,16 +1,16 @@
 package ct.dna.lakehouse.catalogs.dw_tx.showcase
 
 import ct.dna.lakehouse.catalogs._
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
+import ct.dna.lakehouse.dataframeprovider.SnapshotTable
+import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.lakehouse.metastore.LongType
+import ct.dna.lakehouse.metastore.Origin
 import ct.dna.lakehouse.metastore.StringType
-import ct.dna.lakehouse.metastore.Table
-import ct.dna.lakehouse.transformations.ChangeFeedTable
-import ct.dna.lakehouse.transformations.Origin
-import ct.dna.lakehouse.transformations.SnapshotTable
-import ct.dna.lakehouse.transformations.TargetTable
+import ct.dna.lakehouse.metastore.TableDef
 import org.apache.spark.sql.SQLImplicits
 
-object MaterialUsageDetails extends Table with Origin.TwoTransactions {
+object MaterialUsageDetails extends TableDef with Origin.TwoTransactions {
 
   override val keys = Seq(
     ("Article", StringType),
@@ -20,10 +20,10 @@ object MaterialUsageDetails extends Table with Origin.TwoTransactions {
     ("ArticleAmount", LongType),
     ("Amount", LongType)
   )
-  override val changeFeedsOne: Seq[Table] = Seq(dw_md.showcase.BOM)
-  override val changeFeedsTwo: Seq[Table] = Seq(dw_tx.showcase.Orders)
+  override val changeFeedsOne: Seq[TableDef] = Seq(dw_md.showcase.BOM)
+  override val changeFeedsTwo: Seq[TableDef] = Seq(dw_tx.showcase.Orders)
 
-  override def executeTransactionOne(implicits: SQLImplicits, target: TargetTable, changeFeedsOne: Map[Table, ChangeFeedTable]): Boolean = {
+  override def executeTransactionOne(implicits: SQLImplicits, target: TargetTable, changeFeedsOne: Map[TableDef, ChangeFeedTable]): Boolean = {
     val bom = changeFeedsOne(dw_md.showcase.BOM)
 
     target
@@ -41,8 +41,8 @@ object MaterialUsageDetails extends Table with Origin.TwoTransactions {
   override def executeTransactionTwo(
       implicits: SQLImplicits,
       target: TargetTable,
-      changeFeedsTwo: Map[Table, ChangeFeedTable],
-      changeFeedsOne: Map[Table, SnapshotTable]
+      changeFeedsTwo: Map[TableDef, ChangeFeedTable],
+      changeFeedsOne: Map[TableDef, SnapshotTable]
   ): Boolean = { ??? }
 
 }

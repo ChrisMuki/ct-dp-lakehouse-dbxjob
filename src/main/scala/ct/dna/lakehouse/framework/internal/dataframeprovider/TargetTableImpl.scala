@@ -1,8 +1,8 @@
-package ct.dna.lakehouse.framework.internal.transformations
+package ct.dna.lakehouse.framework.internal.dataframeprovider
+import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{columnName => _lh_framework}
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{udfName => update_lh_framework}
-import ct.dna.lakehouse.transformations.TargetTable
 import ct.dna.utils.LoggingTrait
 import io.delta.tables.DeltaMergeBuilder
 import io.delta.tables.DeltaTable

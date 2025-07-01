@@ -1,5 +1,5 @@
 package ct.dna.lakehouse.catalogs.catalog
 
-import ct.dna.lakehouse.metastore.Schema
+import ct.dna.lakehouse.metastore.SchemaDef
 
-package object schema extends Schema
+package object schema extends SchemaDef

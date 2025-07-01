@@ -1,8 +1,8 @@
-package ct.dna.lakehouse.framework.internal.transformations
+package ct.dna.lakehouse.framework.internal.dataframeprovider
 import scala.collection.immutable.ArraySeq
 
+import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework.{columnName => _lh_framework}
-import ct.dna.lakehouse.transformations.ChangeFeedTable
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SQLImplicits
 import org.apache.spark.sql.functions._

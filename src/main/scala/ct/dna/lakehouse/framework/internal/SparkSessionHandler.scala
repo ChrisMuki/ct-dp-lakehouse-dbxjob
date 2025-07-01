@@ -14,6 +14,7 @@ private[internal] object SparkSessionHandler extends LoggingTrait {
       case Lakehouse(stage)  => SparkSession.builder().appName(s"$stage Lakehouse").getOrCreate()
       case Staging(stage)    => SparkSession.builder().appName(s"$stage Staging").getOrCreate()
       case Sandbox(stage, _) => SparkSession.builder().appName(s"$stage Sandbox").getOrCreate()
+      case LocalSpark(host)  => SparkSession.builder().remote(s"sc://$host").getOrCreate()
       case RemoteSandbox(_, _, workspaceUrl, clusterId, pat) =>
         SparkSession.builder().remote(s"sc://$workspaceUrl:443/;token=$pat;x-databricks-cluster-id=$clusterId").getOrCreate()
     }

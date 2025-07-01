@@ -1,9 +1,9 @@
 package ct.dna.lakehouse.catalogs.sr.showcase
 
-import ct.dna.lakehouse.metastore.SRTable
+import ct.dna.lakehouse.metastore.SRTableDef
 import ct.dna.lakehouse.metastore.StringType
 
-object Articles extends SRTable {
+object Articles extends SRTableDef {
   override val keys = Seq(
     ("article", StringType)
   )

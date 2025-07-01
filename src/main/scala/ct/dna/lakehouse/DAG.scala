@@ -5,11 +5,11 @@ import scala.jdk.CollectionConverters.ListHasAsScala
 import scala.util.Try
 
 import ct.dna.lakehouse.framework.Contract.validateTable
-import ct.dna.lakehouse.metastore.Catalog
-import ct.dna.lakehouse.metastore.Schema
-import ct.dna.lakehouse.metastore.Table
+import ct.dna.lakehouse.metastore.CatalogDef
+import ct.dna.lakehouse.metastore.Origin
+import ct.dna.lakehouse.metastore.SchemaDef
+import ct.dna.lakehouse.metastore.TableDef
 import ct.dna.lakehouse.metastore.UnityObject
-import ct.dna.lakehouse.transformations.Origin
 import io.github.classgraph.ClassGraph
 object DAG {
   // WIP
@@ -46,12 +46,12 @@ object DAG {
     val allUnityObjects = findObjects(classOf[UnityObject])
     assert(allUnityObjects.groupBy(_.unityPath).filter(_._2.size > 1).flatMap(_._2).isEmpty)
 
-    val allCatalogs = findObjects(classOf[Catalog])
+    val allCatalogs = findObjects(classOf[CatalogDef])
 
-    val allSchemas = findObjects(classOf[Schema])
-    assert(allSchemas.filterNot(t => allCatalogs.contains(t.catalog)).isEmpty)
-    val allTables = findObjects(classOf[Table])
-    assert(allTables.filterNot(t => allSchemas.contains(t.schema)).isEmpty)
+    val allSchemas = findObjects(classOf[SchemaDef])
+    assert(allSchemas.filterNot(t => allCatalogs.contains(t.catalogDef)).isEmpty)
+    val allTables = findObjects(classOf[TableDef])
+    assert(allTables.filterNot(t => allSchemas.contains(t.schemaDef)).isEmpty)
 
     val allTransformations = findObjects(classOf[Origin])
     assert(allTransformations.map(_.table) == allTables)
