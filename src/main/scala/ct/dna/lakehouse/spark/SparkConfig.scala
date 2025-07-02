@@ -23,7 +23,7 @@ import ct.dna.utils.json.serializer.{TypedProductSerializer => TPS}
 )
 sealed trait SparkConfig
 object SparkConfig {
-  @JsonSerialize(using = classOf[TPS]) final case class LocalSpark(host: String) extends SparkConfig
+  @JsonSerialize(using = classOf[TPS]) final case class LocalSpark(master: String, catalogPath: String) extends SparkConfig
   @JsonSerialize(using = classOf[TPS]) final case class RemoteSandbox(stage: String, uid: String, workspaceUrl: String, clusterId: String, pat: String)
       extends SparkConfig
   @JsonSerialize(using = classOf[TPS]) final case class Sandbox(stage: String, uid: String) extends SparkConfig
