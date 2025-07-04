@@ -1,8 +1,8 @@
 package ct.dna.lakehouse.catalogs.dw_md.showcase
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
 
-import ct.dna.lakehouse.TestSuiteWithEnvironment
-
-class BomTest extends TestSuiteWithEnvironment /* some other suitable as well?*/ {
+class BomTest extends AnyFlatSpec with should.Matchers /* some other suitable as well?*/ {
 
   "dw_md.showcase.Bom" should "be empty when 'sr.showcase.Bom' table is empty" in {
 

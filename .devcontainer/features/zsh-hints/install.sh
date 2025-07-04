@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 set -e
 
-su - sparkdev << 'EOF'
+su - dnadev << 'EOF'
 {
   echo 'echo "Check installed components and versions - lengthy on first run!"'
 

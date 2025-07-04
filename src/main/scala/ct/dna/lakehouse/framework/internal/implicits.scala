@@ -3,6 +3,8 @@ package ct.dna.lakehouse.framework.internal
 import java.sql.Timestamp
 
 import ct.dna.lakehouse.dataframeprovider.Commit
+import ct.dna.lakehouse.framework.internal.FQTN.PATH
+import ct.dna.lakehouse.framework.internal.FQTN.TABLE
 import ct.dna.lakehouse.framework.internal.metadata.Row_lh_framework
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.INGEST
@@ -11,6 +13,8 @@ import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.OPTIMIZE
 import ct.dna.lakehouse.framework.internal.metadata.UserMetadata.STRUCTURE_CHANGE
 import ct.dna.utils.LoggingTrait
 import io.delta.tables.DeltaTable
+import org.apache.spark.sql.DataFrameReader
+import org.apache.spark.sql.DataFrameWriter
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
@@ -19,6 +23,32 @@ import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.types.TimestampType
 
 object implicits extends LoggingTrait {
+
+  private[internal] implicit class DataFrameWriterExtension[T](dfw: DataFrameWriter[T]) {
+    def saveAsFQTN(fqtn: FQTN) = fqtn match {
+      case PATH(value)  => dfw.save(value)
+      case TABLE(value) => dfw.saveAsTable(value)
+    }
+  }
+  private[internal] implicit class DataFrameReaderExtension(dfr: DataFrameReader) {
+    def forFQTN(fqtn: FQTN) = fqtn match {
+      case PATH(value)  => dfr.load(value)
+      case TABLE(value) => dfr.table(value)
+    }
+  }
+  private[internal] implicit class DeltaTableExtension(dt: DeltaTable.type) {
+    def forFQTN(spark: SparkSession, fqtn: FQTN) = fqtn match {
+      case PATH(value)  => dt.forPath(spark, value)
+      case TABLE(value) => dt.forName(spark, value)
+    }
+  }
+
+  // private[internal] implicit class DataframeReaderExtension(dfr: DataFrameReader) {
+  //   def fromFQTN(fqtn: FQTN) = fqtn match {
+  //     case PATH(value)  => dfr.load(value)
+  //     case TABLE(value) => dfr.table(value)
+  //   }
+  // }
 
   private[internal] implicit class SparkExtensions(spark: SparkSession) {
     def setUserMetadata(userMetadata: UserMetadata): Unit =
@@ -57,18 +87,18 @@ object implicits extends LoggingTrait {
       (lastTargetCommit, newInitCommit, lh_framework)
     }
 
-    def readChangeFeedVersionAfter(fqtn: String, known: Commit): (Commit, Commit) = {
-      val df =
-        DeltaTable
-          .forName(spark, fqtn)
-          .history()
-          .filter(s"version >= ${known.version}")
-          .agg(
-            min(struct("version", "timestamp")).as("__from"),
-            max(when(col("userMetadata").startsWith(UserMetadata.STRUCTURE_CHANGE.prefix), struct("version", "timestamp"))).as("__structure_change"),
-            max(struct("version", "timestamp")).as("__to"),
-            max(when(!col("userMetadata").startsWith(UserMetadata.OPTIMIZE.prefix), struct("version", "timestamp"))).as("__nonOptimize")
-          )
+    def readChangeFeedVersionAfter(fqtn: FQTN, known: Commit): (Commit, Commit) = {
+      val dt = DeltaTable.forFQTN(spark, fqtn)
+      val df = dt
+        .history()
+        .filter(s"version >= ${known.version}")
+        .agg(
+          min(struct("version", "timestamp")).as("__from"),
+          max(when(col("userMetadata").startsWith(UserMetadata.STRUCTURE_CHANGE.prefix), struct("version", "timestamp"))).as("__structure_change"),
+          max(struct("version", "timestamp")).as("__to"),
+          max(when(!col("userMetadata").startsWith(UserMetadata.OPTIMIZE.prefix), struct("version", "timestamp"))).as("__nonOptimize")
+        )
+
       if (df.count() > 0) {
         val r = df.first()
         if (r.getAs[Row]("__structure_change") == null)
@@ -82,10 +112,7 @@ object implicits extends LoggingTrait {
             Commit(r.getAs[Long]("__to.version"), r.getAs[Timestamp]("__to.timestamp"))
           )
       } else {
-        val r = DeltaTable
-          .forName(spark, fqtn)
-          .history(1)
-          .first()
+        val r = dt.history(1).first()
         val c = Commit(r.getAs[Long]("version"), r.getAs[Timestamp]("timestamp"))
         (c, c)
       }
@@ -100,7 +127,7 @@ object implicits extends LoggingTrait {
     //   )
 
     // def readDF(fqtn: String) = spark.read.format("delta").table(fqtn)
-    def readDF(fqtn: String, versionAsOf: Long) = spark.read.format("delta").option("versionAsOf", versionAsOf).table(fqtn)
+    def readDF(fqtn: FQTN, versionAsOf: Long) = spark.read.format("delta").option("versionAsOf", versionAsOf).forFQTN(fqtn)
 
     /**   - startingVersion > endingVersion => org.apache.spark.SparkException: [INTERNAL_ERROR] Cannot find main error class 'DELTA_INVALID_CDC_RANGE'
       *     SQLSTATE: XX000
@@ -109,34 +136,34 @@ object implicits extends LoggingTrait {
       *     is invalid. Start version cannot be greater than the latest version of the table(actualVersion).
       */
 
-    def emptyCDF(fqtn: String, versionAsOf: Long) = if (false)
+    def emptyCDF(fqtn: FQTN, versionAsOf: Long) = if (false) {
       spark.read
         .format("delta")
         .option("readChangeFeed", "true")
         .option("startingVersion", versionAsOf)
         .option("endingVersion", versionAsOf)
-        .table(fqtn)
-        .limit(0)
-    else
+        .forFQTN(fqtn)
+    } else
       readDF(fqtn, versionAsOf)
         .limit(0)
         .withColumn("_change_type", lit(null).cast(StringType))
         .withColumn("_commit_version", lit(null).cast(LongType))
         .withColumn("_commit_timestamp", lit(null).cast(TimestampType))
 
-    def readCDF(fqtn: String, startingVersion: Long, endingVersion: Long) = {
+    def readCDF(fqtn: FQTN, startingVersion: Long, endingVersion: Long) = {
       // we need to choose a proper option for the empty dataset
       if (startingVersion > endingVersion) { emptyCDF(fqtn, endingVersion) }
-      else
+      else {
         spark.read
           .format("delta")
           .option("readChangeFeed", "true")
           .option("startingVersion", startingVersion)
           .option("endingVersion", endingVersion)
-          .table(fqtn)
+          .forFQTN(fqtn)
+      }
     }
 
-    def initCDF(fqtn: String, initComit: Commit, endingVersion: Long) =
+    def initCDF(fqtn: FQTN, initComit: Commit, endingVersion: Long) =
       readDF(fqtn, initComit.version)
         .withColumn("_change_type", lit("initial"))
         .withColumn("_commit_version", lit(initComit.version))

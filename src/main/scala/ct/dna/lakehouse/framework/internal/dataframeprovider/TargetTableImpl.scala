@@ -47,9 +47,9 @@ private[internal] case class TargetTableImpl(
         source
           .unionByName(Seq((new_lh_framework.asValue)).toDF(_lh_framework), true)
           .as(sourceAlias),
-        (source__lh_meta.isNull and target__lh_meta.isNull) or (source__lh_meta.isNotNull and target__lh_meta.isNotNull and condition)
+        (source__lh_meta.isNull and target__lh_meta.isNull and condition) or (source__lh_meta.isNotNull and target__lh_meta.isNotNull)
       )
-      .whenMatched(source__lh_meta.isNull and target__lh_meta.isNull)
+      .whenMatched(source__lh_meta.isNotNull and target__lh_meta.isNotNull)
       .update(
         Map(_lh_framework -> expr(s"$update_lh_framework(${alias}.${_lh_framework}),${sourceAlias}.${_lh_framework},'${last_lh_framework.asValue}'"))
       )

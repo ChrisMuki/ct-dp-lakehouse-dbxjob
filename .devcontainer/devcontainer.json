@@ -1,30 +1,23 @@
 {
   "name": "Feature-based Devcontainer with common-utils",
   "image": "common-docker-r.artifactory.geo.conti.de/ubuntu:22.04",
-
   "overrideFeatureInstallOrder": [
     "./features/conti-ca-certificates",
-    "./features/dbx-env-setup",
-    "./features/azure-cli",
-    "./features/databricks-cli",
-    "./features/coursier",
-    "./features/java-17-setup",
-    "./features/zsh-hints"
+    "ghcr.io/devcontainers/features/common-utils",
+    "./features/dataplatform"
+    // ,    "./features/zsh-hints"
   ],
   "features": {
-    "./features/dbx-env-setup": {
+    "./features/conti-ca-certificates": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
       "installGit": true,
       "configureZshAsDefaultShell": true,
-      "username": "sparkdev"
+      "username": "dnadev"
     },
-    "./features/conti-ca-certificates": {},
-    "./features/azure-cli": {},
-    "./features/databricks-cli": {},
-    "./features/coursier": {},
-    "./features/java-17-setup": {},
-    "./features/zsh-hints": {}
+    "./features/dataplatform": {}
+    // ,    "./features/zsh-hints": {}
   },
-  "remoteUser": "sparkdev",
+  "remoteUser": "dnadev",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -33,10 +26,22 @@
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",
-        "metals.buildServer": "sbt"
+        "metals.javaVersion": "17",
+        "metals.buildServer": "sbt",
+        "metals.serverProperties": [
+          "-Xmx2G",
+          "-XX:+UseZGC",
+          "-XX:ZUncommitDelay=30",
+          "-XX:ZCollectionInterval=5",
+          "-XX:+IgnoreUnrecognizedVMOptions",
+          "--add-opens=java.base/java.nio=ALL-UNNAMED",
+          "--add-opens=java.base/java.net=ALL-UNNAMED"
+        ]
       }
     }
   },
-  "postCreateCommand": "(sbt compile || true) && echo 'Devcontainer setup completed'",
-  "mounts": []
+  "postCreateCommand": "zsh ./.devcontainer/postCreateCommand.zsh",
+  "mounts": [
+    "source=${localEnv:HOME}/.sbt/,target=/mnt/host.sbt/,type=bind"
+  ]
 }

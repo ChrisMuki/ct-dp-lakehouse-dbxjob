@@ -16,7 +16,7 @@ trait TargetTable {
     */
   def getSnapshot: DataFrame
 
-  def merge(source: DataFrame, condition: String, sourceAlies: String = "source"): DeltaMergeBuilder
-  def merge(source: DataFrame, condition: Column, sourceAlies: String): DeltaMergeBuilder
+  def merge(source: DataFrame, condition: String, sourceAlias: String = "source"): DeltaMergeBuilder
+  def merge(source: DataFrame, condition: Column, sourceAlias: String): DeltaMergeBuilder
 
 }

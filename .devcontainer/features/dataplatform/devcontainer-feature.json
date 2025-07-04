@@ -1,0 +1,10 @@
+{
+  "id": "dataplatform",
+  "version": "1.0.0",
+  "name": "Dataplatform",
+  "description": "Installs Dataplatform dev related tools.",
+  "installsAfter": [
+    "./conti-ca-certificates",
+    "ghcr.io/devcontainers/features/common-utils"
+  ]
+}

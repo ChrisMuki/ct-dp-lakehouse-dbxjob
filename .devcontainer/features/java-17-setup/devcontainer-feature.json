@@ -1,7 +1,0 @@
-{
-  "id": "java-17-setup",
-  "version": "1.0.0",
-  "name": "Java installation with Conti Certificates",
-  "description": "Installs java via cs and inports conti root certificates.",
-  "installsAfter": [ "./dbx-env-setup" ,"./coursier"]
-}

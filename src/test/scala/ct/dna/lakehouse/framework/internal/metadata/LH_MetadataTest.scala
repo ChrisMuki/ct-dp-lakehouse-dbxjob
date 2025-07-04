@@ -1,12 +1,13 @@
 package ct.dna.lakehouse.framework.internal.metadata
 
-import ct.dna.lakehouse.TestSuiteWithEnvironment
 import ct.dna.lakehouse.dataframeprovider.ChangeFeedTable
 import ct.dna.lakehouse.dataframeprovider.Commit
 import ct.dna.lakehouse.dataframeprovider.TargetTable
 import ct.dna.utils.json.mapper
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
 
-class Row_lh_frameworkTest extends TestSuiteWithEnvironment {
+class Row_lh_frameworkTest extends AnyFlatSpec with should.Matchers {
 
   lazy val meta1 = mapper.writeValueAsString(Row_lh_framework(Map.empty, TargetTable.Version(Commit(47, null), Commit(59, null))))
   lazy val meta2 =

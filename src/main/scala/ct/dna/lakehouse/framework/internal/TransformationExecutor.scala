@@ -11,8 +11,9 @@ import ct.dna.lakehouse.framework.internal.metadata.UserMetadata
 import ct.dna.lakehouse.metastore.Origin
 import ct.dna.lakehouse.metastore.Origin.Transformation
 import ct.dna.lakehouse.metastore.TableDef
-import ct.dna.lakehouse.spark.SparkConfig
 import ct.dna.utils.LoggingTrait
+import ct.dna.utils.spark.SparkConfig
+import ct.dna.utils.spark.SparkSessionHandler
 import io.delta.tables.DeltaTable
 import org.apache.spark.sql.SparkSession
 private[internal] case class TransformationExecutor(environment: SparkConfig) extends LoggingTrait {
@@ -43,9 +44,12 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
     }
   }
 
-  def prepareDataframeProviders(target_fqtn: String, cFDefs: Seq[TableDef]): (TargetTable, Map[TableDef, ChangeFeedTable]) = {
+  def prepareDataframeProviders(target_fqtn: FQTN, cFDefs: Seq[TableDef]): (TargetTable, Map[TableDef, ChangeFeedTable]) = {
 
-    val targetDeltaTable = DeltaTable.forName(spark, target_fqtn)
+    val targetDeltaTable = target_fqtn match {
+      case FQTN.PATH(fqtn)  => DeltaTable.forPath(spark, fqtn)
+      case FQTN.TABLE(fqtn) => DeltaTable.forName(spark, fqtn)
+    }
     val (lastCommit, newInitCommit, last_lh_framework) = spark.readTargetDeltaHistory(targetDeltaTable)
 
     val cfTables = cFDefs.map(cFDef => cFDef -> buildCFTable(cFDef, last_lh_framework.changeFeedVersions)).toMap
@@ -58,7 +62,7 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
       TargetTable.Version(init = newInitCommit, last = lastCommit)
     )
 
-    val targetTable = TargetTableImpl(spark.implicits, target_fqtn, targetDeltaTable, last_lh_framework, new_lh_framework)
+    val targetTable = TargetTableImpl(spark.implicits, target_fqtn.value, targetDeltaTable, last_lh_framework, new_lh_framework)
 
     val updatedChangeFeedCommits =
       newChangeFeedVersions.filter { case (t, v) => Some(v.current) != last_lh_framework.changeFeedVersions.get(t) }.map { case (t, v) => (t, v.current) }
@@ -77,7 +81,7 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
   def buildCFTable(cFDef: TableDef, sourceVersions: Map[String, ChangeFeedTable.Version]): ChangeFeedTable = {
 
     val source_fqtn = CatalogAccess.source_fqtn(cFDef)
-    val knownVersion = sourceVersions.get(source_fqtn).getOrElse(ChangeFeedTable.Version(Commit(-1, null), Commit(-1, null)))
+    val knownVersion = sourceVersions.get(source_fqtn.value).getOrElse(ChangeFeedTable.Version(Commit(-1, null), Commit(-1, null)))
 
     val (knownOrLater, currentCommit) = spark.readChangeFeedVersionAfter(source_fqtn, knownVersion.current)
     if (knownVersion.current.version == currentCommit.version) {
@@ -85,7 +89,7 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
       ChangeFeedTableImpl(
         spark.implicits,
         cFDef.keys.map(t => t._1),
-        source_fqtn,
+        source_fqtn.value,
         spark.readDF(source_fqtn, currentCommit.version),
         spark.emptyCDF(source_fqtn, currentCommit.version),
         ChangeFeedTable.Version(knownVersion.init, currentCommit),
@@ -96,7 +100,7 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
       ChangeFeedTableImpl(
         spark.implicits,
         cFDef.keys.map(t => t._1),
-        source_fqtn,
+        source_fqtn.value,
         spark.readDF(source_fqtn, currentCommit.version),
         spark.readCDF(source_fqtn, knownVersion.current.version + 1, currentCommit.version),
         ChangeFeedTable.Version(knownVersion.init, currentCommit),
@@ -107,7 +111,7 @@ private[internal] case class TransformationExecutor(environment: SparkConfig) ex
       ChangeFeedTableImpl(
         spark.implicits,
         cFDef.keys.map(t => t._1),
-        source_fqtn,
+        source_fqtn.value,
         spark.readDF(source_fqtn, currentCommit.version),
         spark.initCDF(source_fqtn, knownOrLater, currentCommit.version),
         ChangeFeedTable.Version(knownOrLater, currentCommit),

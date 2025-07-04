@@ -1,7 +1,0 @@
-{
-  "id": "databricks-cli",
-  "version": "1.0.0",
-  "name": "Databricks CLI",
-  "description": "Installs Databricks CLI for sparkdev.",
-  "installsAfter": [ "./dbx-env-setup"]
-}

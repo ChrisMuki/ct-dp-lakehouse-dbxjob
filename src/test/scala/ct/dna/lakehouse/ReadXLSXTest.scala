@@ -1,9 +1,10 @@
 package ct.dna.lakehouse
 import ct.dna.lakehouse.catalogs.testOnly
 import ct.dna.lakehouse.metastore.TableDef
+import ct.dna.utils.spark.TestWithSparkHandler
 import org.apache.spark.sql.DataFrame
 
-class ReadXLSXTest extends TestSuiteWithEnvironment {
+class ReadXLSXTest extends TestWithSparkHandler {
 
   def read(p: String, t: TableDef): DataFrame = ???
 

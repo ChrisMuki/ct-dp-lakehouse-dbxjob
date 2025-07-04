@@ -1,7 +1,0 @@
-{
-  "id": "azure-cli",
-  "version": "1.0.0",
-  "name": "Azure CLI",
-  "description": "Installs Azure CLI.",
-  "installsAfter": [ "./dbx-env-setup" ]
-}

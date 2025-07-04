@@ -1,3 +1,4 @@
+#Version 1
 # ignore macOS local files
 .DS_Store
 # ignore vscode and metals local files
@@ -10,10 +11,11 @@ target/*
 sbt-launch.jar
 # ignore sbt local files
 .bsp**
-# ignore local runtime config folder
+# ignore local runtime config
 config/config.json
 # ignore pergola access key
 _pergola_access_key.zsh
-
-
+# ignore derby.log
+derby.log
+#ignore databricks logal files
 .databricks
