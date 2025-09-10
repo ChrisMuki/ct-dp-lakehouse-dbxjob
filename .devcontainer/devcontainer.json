@@ -1,5 +1,5 @@
 {
-  "name": "Feature-based Devcontainer with common-utils",
+  "name": "DNA",
   "image": "common-docker-r.artifactory.geo.conti.de/ubuntu:22.04",
   "overrideFeatureInstallOrder": [
     "./features/conti-ca-certificates",
@@ -27,7 +27,7 @@
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",
         "metals.javaVersion": "17",
-        "metals.buildServer": "sbt",
+        "metals.fallbackScalaVersion": "2.13.16",
         "metals.serverProperties": [
           "-Xmx2G",
           "-XX:+UseZGC",
@@ -35,13 +35,18 @@
           "-XX:ZCollectionInterval=5",
           "-XX:+IgnoreUnrecognizedVMOptions",
           "--add-opens=java.base/java.nio=ALL-UNNAMED",
-          "--add-opens=java.base/java.net=ALL-UNNAMED"
+          "--add-opens=java.base/java.net=ALL-UNNAMED",
+          "--add-opens=java.base/java.lang=ALL-UNNAMED",
+          "--add-opens=java.base/java.util=ALL-UNNAMED",
+          "--add-opens=java.base/java.util=ALL-UNNAMED",
+          "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+          "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
         ]
       }
     }
   },
   "postCreateCommand": "zsh ./.devcontainer/postCreateCommand.zsh",
   "mounts": [
-    "source=${localEnv:HOME}/.sbt/,target=/mnt/host.sbt/,type=bind"
+    "source=${localEnv:HOME}/,target=/mnt/host.home/,type=bind"
   ]
 }

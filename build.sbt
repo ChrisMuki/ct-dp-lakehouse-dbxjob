@@ -15,7 +15,12 @@ javaOptions ++= Seq(
   "-Xss4M",
   "-XX:ReservedCodeCacheSize=128m",
   "--add-opens=java.base/java.nio=ALL-UNNAMED",
-  "--add-opens=java.base/java.net=ALL-UNNAMED"
+  "--add-opens=java.base/java.net=ALL-UNNAMED",
+  "--add-opens=java.base/java.lang=ALL-UNNAMED",
+  "--add-opens=java.base/java.util=ALL-UNNAMED",
+  "--add-opens=java.base/java.util=ALL-UNNAMED",
+  "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+  "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
 )
 Test / fork := true
 fork := true
@@ -26,25 +31,9 @@ lazy val root = project
   .settings(
     name := "dp-lakehouse-dbxjob",
     libraryDependencies ++= Seq(
-      "ct.dna" %% "common-utils" % "0.0.1",
-      "ct.dna" %% "spark-utils" % "0.0.3",
-      "org.apache.spark" %% "spark-sql" % "4.0.0" % Provided,
-      "io.delta" %% "delta-spark" % "4.0.0" % Provided,
-
-      // For DAG
-      "io.github.classgraph" % "classgraph" % "4.8.179",
-
-      // Required Test libraries
-      // Spark
-      "org.apache.spark" %% "spark-core" % "4.0.0" % Test,
-      "org.apache.spark" %% "spark-sql" % "4.0.0" % Test,
-      "org.apache.spark" %% "spark-connect-client-jvm" % "4.0.0" % Test,
-      "org.apache.spark" %% "spark-hive" % "4.0.0" % Test,
-      // Delta
-      "io.delta" %% "delta-spark" % "4.0.0" % Test,
-      "io.delta" %% "delta-connect-client" % "4.0.0" % Test,
-      // Local Catalog
-      "org.apache.derby" % "derby" % "10.16.1.1" % Test,
-      "org.scalatest" %% "scalatest" % "3.2.19" % Test
+      "ct.dna" %% "lakehouse-framework" % "25.1.0",
+      "ct.dna" %% "macro-utils" % "25.0.0",
+      "ct.dna" %% "dbr-provided" % "25.0.0" % Provided,
+      "ct.dna" %% "spark-test" % "25.2.0" % Test
     )
   )

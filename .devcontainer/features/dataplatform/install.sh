@@ -73,3 +73,8 @@ echo "in feature install 'java-17-setup' $CERT_SRC_DIR"
 # git lfs
 sudo apt-get install git-lfs
 ################################################################################
+
+################################################################################
+# Pergola Cli 
+curl -fsSL https://get.pergo.la/cli/latest/install.sh | bash
+################################################################################
