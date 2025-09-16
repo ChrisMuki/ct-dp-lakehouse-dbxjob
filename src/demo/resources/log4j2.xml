@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="OFF">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <!-- Disable all org.apache logs -->
+        <Logger name="org.apache" level="OFF"/>
+        <Logger name="org.spark_project" level="OFF"/>
+        <Logger name="org.apache.spark" level="OFF"/>
+        <Logger name="org.apache.hadoop" level="OFF"/>
+        <Logger name="org.apache.parquet" level="OFF"/>
+        <Logger name="org.apache.derby" level="OFF"/>
+        
+        <!-- Root logger -->
+        <Root level="ERROR">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

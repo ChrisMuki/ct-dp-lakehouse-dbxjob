@@ -1,20 +1,20 @@
 package ct.dna.lakehouse.catalogs.sr.iamer_norz_masda
 
-import ct.dna.lakehouse.metastore.Entity
-import ct.dna.lakehouse.metastore.Entity.key
+import ct.dna.utils.spark.entity.Entity
+import ct.dna.utils.spark.entity.pk
 import ct.dna.lakehouse.metastore.SRTableDef
 
 case class masda_orders_Entity(
-    @key _mk_org_String: String,
-    @key _mk_site_String: String,
-    @key _mk_system_String: String,
-    @key _mk_instance_String: String,
-    @key _mk_partition_String: String,
-    @key _mk_file_String: String,
+    @pk _mk_org_String: String,
+    @pk _mk_site_String: String,
+    @pk _mk_system_String: String,
+    @pk _mk_instance_String: String,
+    @pk _mk_partition_String: String,
+    @pk _mk_file_String: String,
     _mk_container_String: String,
     _mk_account_String: String,
     _mk_createdAt_String: String,
-    @key _lh_id_in_message_Long: Long,
+    @pk _lh_id_in_message_Long: Long,
     _lh_ingest_warning_Json: String,
     unix_run_num_String: String,
     spec_name_String: String,

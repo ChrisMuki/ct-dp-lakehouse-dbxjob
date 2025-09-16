@@ -1,5 +1,9 @@
 #!/usr/bin/env zsh
 # Version 2
+
+JVM_SPEC="temurin:1.17"                          # in sync with features/dataplatform/install.sh
+eval "$(cs java --jvm $JVM_SPEC --update --env)"
+
 sudo ln -snf /usr/share/zoneinfo/UTC /etc/localtime
 echo UTC | sudo tee /etc/timezone > /dev/null 
 

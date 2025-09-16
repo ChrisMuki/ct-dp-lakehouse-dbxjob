@@ -12,6 +12,9 @@ curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
 ################################################################################
 
+
+
+
 ################################################################################
 # Coursier
 
@@ -50,23 +53,30 @@ su - dnadev -c 'cs setup --yes'
 set +u
 set +o pipefail
 
-su - dnadev -c 'cs java --jvm temurin:1.17 --setup'
-echo "JAVA_HOME:" 
-echo $JAVA_HOME
+# ---- settings ----
+JVM_SPEC="temurin:1.17"                          # in sync with postCreateCommand.zsh
+CERT_SRC_DIR="$(cd "$(dirname "$0")/certificates" && pwd -P)"   
+# -------------------
 
-cs java --jvm temurin:1.17 --update --env
-echo "Eval --env"
-eval "$(cs java --jvm temurin:1.17 --update --env)"
+# 1) Ensure the JDK is installed for the target user
+su - dnadev -lc "cs java --jvm '$JVM_SPEC' --setup"
 
-echo "JAVA_HOME:" 
-echo $JAVA_HOME
+# 2) Resolve that user's JAVA_HOME deterministically
+USER_JAVA_HOME="$(su - dnadev -lc "cs java-home --jvm '$JVM_SPEC'")"
+STORE="$USER_JAVA_HOME/lib/security/cacerts"
+echo "Using JAVA_HOME for dnadev: $USER_JAVA_HOME"
+echo "Truststore: $STORE"
 
+# 3) Import/replace all certificates
 
-CERT_SRC_DIR="$(dirname "$0")/certificates"
-echo "in feature install 'java-17-setup' $CERT_SRC_DIR"
-"$JAVA_HOME/bin/keytool"   -import -noprompt -trustcacerts -alias conti-ca-cert1 -file "$CERT_SRC_DIR"/conti-ca-cert1.crt -cacerts -storepass changeit
-"$JAVA_HOME/bin/keytool"   -import -noprompt -trustcacerts -alias conti-ca-cert2 -file "$CERT_SRC_DIR"/conti-ca-cert2.crt -cacerts -storepass changeit
-"$JAVA_HOME/bin/keytool"   -import -noprompt -trustcacerts -alias conti-ca-cert3 -file "$CERT_SRC_DIR"/conti-ca-cert3.crt -cacerts -storepass changeit
+for crt_file in "$CERT_SRC_DIR"/*.crt; do
+  if [ -f "$crt_file" ]; then
+    crt_filename=$(basename "$crt_file")
+    alias_name="${crt_filename%.crt}"
+    echo "Importiere Zertifikat $crt_file mit Alias $alias_name"
+    "$USER_JAVA_HOME/bin/keytool" -import -noprompt -trustcacerts -alias "$alias_name" -file "$crt_file" -cacerts -storepass changeit
+  fi
+done
 ################################################################################
 
 ################################################################################

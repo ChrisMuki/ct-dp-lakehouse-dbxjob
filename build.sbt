@@ -4,7 +4,8 @@ ThisBuild / scalaVersion := "2.13.16"
 
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-unchecked", "-Wunused:imports")
 ThisBuild / javacOptions ++= Seq("-Xlint:deprecation")
-ThisBuild / resolvers += "Artifactory" at "https://eu.artifactory.conti.de/artifactory/ct_dsf_sbt_l/"
+ThisBuild / resolvers += "Artifactory Realm" at "https://artifacts.ws.contitech.cloud/artifactory/ct_dsf_sbt_l/"
+ThisBuild / credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 ThisBuild / outputStrategy := Some(StdoutOutput)
 ThisBuild / Test / logBuffered := true
 ThisBuild / Test / parallelExecution := false
@@ -31,9 +32,8 @@ lazy val root = project
   .settings(
     name := "dp-lakehouse-dbxjob",
     libraryDependencies ++= Seq(
-      "ct.dna" %% "lakehouse-framework" % "25.1.0",
-      "ct.dna" %% "macro-utils" % "25.0.0",
-      "ct.dna" %% "dbr-provided" % "25.0.0" % Provided,
-      "ct.dna" %% "spark-test" % "25.2.0" % Test
+      "ct.dna" %% "lakehouse-core" % "0.1.0",
+      "ct.dna" %% "spark-runtime" % "0.1.0" % Provided,
+      "ct.dna" %% "spark-test" % "0.1.0" % Test
     )
   )
