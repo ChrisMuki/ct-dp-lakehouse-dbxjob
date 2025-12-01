@@ -1,31 +1,27 @@
 {
-  "name": "DNA",
-  "image": "common-docker-r.artifactory.geo.conti.de/ubuntu:22.04",
-  "overrideFeatureInstallOrder": [
-    "./features/conti-ca-certificates",
-    "ghcr.io/devcontainers/features/common-utils",
-    "./features/dataplatform"
-    // ,    "./features/zsh-hints"
-  ],
-  "features": {
-    "./features/conti-ca-certificates": {},
-    "ghcr.io/devcontainers/features/common-utils:2": {
-      "installGit": true,
-      "configureZshAsDefaultShell": true,
-      "username": "dnadev"
-    },
-    "./features/dataplatform": {}
-    // ,    "./features/zsh-hints": {}
+  "name": "Lakehouse",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "BUILD_INFO": "${localEnv:HOSTNAME}"
+    }
   },
-  "remoteUser": "dnadev",
+  "runArgs": [
+    "--env-file",
+    ".devcontainer/.proxy.env"
+  ],
+  "initializeCommand": "bash .devcontainer/scripts/gen_proxy_env.sh .devcontainer/.proxy.env",
+  "containerUser": "vscode",
+  "updateRemoteUserUID": true,
+  "mounts": [
+    "type=bind,source=${env:HOME}/.gitconfig,target=/home/vscode/.gitconfig",
+    "type=bind,source=${env:HOME}/.sbt/.credentials,target=/home/vscode/.sbt/.credentials"
+  ],
+  "postCreateCommand": "/bin/bash .devcontainer/postCreateCommand.sh",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "scalameta.metals",
-        "mhutchie.git-graph"
-      ],
       "settings": {
-        "terminal.integrated.defaultProfile.linux": "zsh",
+        // "terminal.integrated.defaultProfile.linux": "zsh",
         "metals.javaVersion": "17",
         "metals.fallbackScalaVersion": "2.13.16",
         "metals.serverProperties": [
@@ -42,11 +38,14 @@
           "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
           "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
         ]
-      }
+      },
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "ms-vscode.azurecli",
+        "scalameta.metals",
+        "mhutchie.git-graph"
+      ]
     }
-  },
-  "postCreateCommand": "zsh ./.devcontainer/postCreateCommand.zsh",
-  "mounts": [
-    "source=${localEnv:HOME}/,target=/mnt/host.home/,type=bind"
-  ]
+  }
 }

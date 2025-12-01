@@ -1,6 +1,0 @@
-{
-  "id": "zsh-hints",
-  "version": "1.0.0",
-  "name": "Login hints",
-  "description": "Adds helpful login hints to .bashrc (dnadev)."
-}

@@ -52,10 +52,12 @@ object Orders extends TableDef[Order] with Origin.OneTransaction[Order] {
   override def changeFeeds: Seq[TableDef[Entity]] = Seq(sr.iamer_norz_enterprise.enterprise_orders, sr.iamer_norz_masda.masda_orders)
   override def executeTransaction(implicits: SQLImplicits, target: TargetTable, changeFeeds: Map[TableDef[Entity], ChangeFeedTable]): Boolean = {
     import implicits._
-    val source = changeFeeds(sr.iamer_norz_enterprise.enterprise_orders).getChangeFeed_last().unionByName(
-      changeFeeds(sr.iamer_norz_masda.masda_orders).getChangeFeed_last(),
-      true
-    )
+    val source = changeFeeds(sr.iamer_norz_enterprise.enterprise_orders)
+      .getChangeFeed_last()
+      .unionByName(
+        changeFeeds(sr.iamer_norz_masda.masda_orders).getChangeFeed_last(),
+        true
+      )
     val tc = Struct.Of[Order].TargetColNames
     val sc = Struct.Of[Order].SourceColNames
 
