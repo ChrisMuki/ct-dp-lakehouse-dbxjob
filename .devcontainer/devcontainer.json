@@ -1,10 +1,7 @@
 {
   "name": "Lakehouse",
   "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "BUILD_INFO": "${localEnv:HOSTNAME}"
-    }
+    "dockerfile": "Dockerfile"
   },
   "runArgs": [
     "--env-file",
@@ -43,7 +40,7 @@
         "ms-azuretools.vscode-docker",
         "redhat.vscode-yaml",
         "ms-vscode.azurecli",
-        "scalameta.metals",
+        "scalameta.metals@1.59.0",
         "mhutchie.git-graph"
       ]
     }

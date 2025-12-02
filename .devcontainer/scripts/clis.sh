@@ -8,6 +8,7 @@ echo "===> Azure CLI Installing..."
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 echo "===>  Azure CLI Done"
 
+
 echo "===>  Pergola CLI => Installing..."
 curl -fsSL https://get.pergo.la/cli/latest/install.sh | bash
 echo "===> Pergola CLI Done"
@@ -27,7 +28,4 @@ else
         HTTPS_PROXY=$HTTPS_PROXY \
         bash
 fi
-
-
-
 echo "===> Databricks CLI Done"
