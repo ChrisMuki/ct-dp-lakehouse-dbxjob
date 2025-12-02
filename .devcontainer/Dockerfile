@@ -1,7 +1,5 @@
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-22.04
 
-ARG BUILD_INFO
-RUN echo "BUILD_INFO=$BUILD_INFO"
 USER root
 
 # ----------------------------------------------------------------------
@@ -52,7 +50,7 @@ RUN ./tmp/gen_proxy_env.sh /home/vscode/tmp/.proxy.env
 RUN ./tmp/clis.sh
 RUN ./tmp/coursier.sh
 RUN ./tmp/java_cert.sh
-
+RUN ./tmp/tofu.sh
 
 
 WORKDIR /workspaces

@@ -1,10 +1,7 @@
 {
   "name": "Lakehouse",
   "build": {
-    "dockerfile": "Dockerfile",
-    "args": {
-      "BUILD_INFO": "${localEnv:HOSTNAME}"
-    }
+    "dockerfile": "Dockerfile"
   },
   "runArgs": [
     "--env-file",
@@ -14,8 +11,7 @@
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
   "mounts": [
-    "type=bind,source=${env:HOME}/.gitconfig,target=/home/vscode/.gitconfig",
-    "type=bind,source=${env:HOME}/.sbt/.credentials,target=/home/vscode/.sbt/.credentials"
+    "type=bind,source=${env:HOME},target=/home/vscode/host.home"
   ],
   "postCreateCommand": "/bin/bash .devcontainer/postCreateCommand.sh",
   "customizations": {
@@ -24,6 +20,8 @@
         // "terminal.integrated.defaultProfile.linux": "zsh",
         "metals.javaVersion": "17",
         "metals.fallbackScalaVersion": "2.13.16",
+        "metals.buildTool": "sbt",
+        "metals.bloopEnabled": false,
         "metals.serverProperties": [
           "-Xmx2G",
           "-XX:+UseZGC",
@@ -36,14 +34,15 @@
           "--add-opens=java.base/java.util=ALL-UNNAMED",
           "--add-opens=java.base/java.util=ALL-UNNAMED",
           "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-          "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
+          "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED",
+          "-Djava.net.useSystemProxies=true"
         ]
       },
       "extensions": [
         "ms-azuretools.vscode-docker",
         "redhat.vscode-yaml",
         "ms-vscode.azurecli",
-        "scalameta.metals",
+        "scalameta.metals@1.59.0",
         "mhutchie.git-graph"
       ]
     }
