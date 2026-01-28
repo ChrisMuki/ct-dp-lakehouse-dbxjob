@@ -11,12 +11,12 @@ PROXY_CANDIDATES=(
 # Pro Proxy unterschiedliche NO_PROXY-Werte
 # Passe diese Maps nach Bedarf an (Keys = Proxy-Name aus PROXY_CANDIDATES)
 declare -A NON_PROXY_HOSTS_ENV_MAP=(
-    ["cias"]="127.0.0.1,localhost,.conti.de,ct-ind.com,contiwan.com,contitech.de"
+    ["cias"]="127.0.0.1,localhost,.conti.de,ct-ind.com,contiwan.com,dsf.contitech.de,169.254.169.254"
     ["bpa-eqx"]="127.0.0.1,localhost"
 )
 
 declare -A NON_PROXY_HOSTS_JAVA_MAP=(
-    ["cias"]="127.0.0.1|localhost|*.conti.de|*.ct-ind.com|*.contiwan.com|*.contitech.de"
+    ["cias"]="127.0.0.1|localhost|*.conti.de|*.ct-ind.com|*.contiwan.com|*.dsf.contitech.de|169.254.169.254"
     ["bpa-eqx"]="127.0.0.1|localhost"
 )
 
@@ -30,9 +30,9 @@ write_proxy_env() {
     local port="$3"
     local url="http://$host:$port"
 
-    # Proxy-spezifische NO_PROXY-Werte ermitteln (fallback auf Default)
-    local non_proxy_env="${NON_PROXY_HOSTS_ENV_MAP[$name]:-$DEFAULT_NON_PROXY_HOSTS_ENV}"
-    local non_proxy_java="${NON_PROXY_HOSTS_JAVA_MAP[$name]:-$DEFAULT_NON_PROXY_HOSTS_JAVA}"
+    # Proxy-spezifische NO_PROXY-Werte ermitteln (Fallback auf leer)
+    local non_proxy_env="${NON_PROXY_HOSTS_ENV_MAP[$name]:-}"
+    local non_proxy_java="${NON_PROXY_HOSTS_JAVA_MAP[$name]:-}"
 
     echo "Container needs $url"
     echo "CONTAINER_NEEDED_PROXY=$name" >> "$OUT_FILE"
