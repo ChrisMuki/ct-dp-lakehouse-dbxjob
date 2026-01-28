@@ -1,41 +1,96 @@
 import sbt._
-object DBX_Runtime_Assembly {
-  // adapted for DBT 17.0 Beta
-  lazy val shadedLibs: Seq[ModuleID] = Seq(
-    "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.13.5",
-    "io.dropwizard.metrics" % "metrics-core" % "4.1.0",
-    "io.netty" % "netty-buffer" % "4.1.110.Final",
-    "io.netty" % "netty-codec" % "4.1.110.Final",
-    "io.netty" % "netty-codec-http" % "4.1.110.Final",
-    "io.netty" % "netty-codec-http2" % "4.1.110.Final",
-    "io.netty" % "netty-codec-socks" % "4.1.110.Final",
-    "io.netty" % "netty-common" % "4.1.110.Final",
-    "io.netty" % "netty-handler" % "4.1.110.Final",
-    "io.netty" % "netty-handler-proxy" % "4.1.110.Final",
-    "io.netty" % "netty-resolver" % "4.1.110.Final",
-    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.65.Final",
-    "io.netty" % "netty-tcnative-classes" % "2.0.65.Final",
-    "io.netty" % "netty-transport" % "4.1.110.Final",
-    "io.netty" % "netty-transport-classes-epoll" % "4.1.110.Final",
-    "io.netty" % "netty-transport-classes-kqueue" % "4.1.110.Final",
-    "io.netty" % "netty-transport-native-epoll" % "4.1.110.Final",
-    "io.netty" % "netty-transport-native-kqueue" % "4.1.110.Final",
-    "io.netty" % "netty-transport-native-unix-common" % "4.1.110.Final",
-    "net.java.dev.jna" % "jna" % "5.13.0",
-    "org.slf4j" % "slf4j-api" % "2.0.9"
+import sbt.Keys._
+import sbtassembly.AssemblyPlugin
+import sbtassembly.AssemblyPlugin.autoImport._
+
+object DBX_ASSEMBLY_17_3 extends AutoPlugin {
+
+  override def requires = AssemblyPlugin
+  override def trigger = allRequirements
+
+  object autoImport {
+    // pro Projekt anpassbar:
+    val dbxShadedLibs = settingKey[Seq[ModuleID]]("Libs, die in DBX JARs geshadet werden")
+  }
+  import autoImport._
+
+  override def projectSettings: Seq[Def.Setting[_]] = Seq(
+    // Defaultwert, falls ein Projekt dbxShadedLibs nicht explizit setzt
+    dbxShadedLibs := Seq.empty,
+
+    // Shade-Regeln
+    assembly / assemblyShadeRules ++= dbxShadedLibs.value.map { moduleID => ShadeRule.rename("*.**" -> "ct.dna.shaded.@0").inLibrary(moduleID) },
+
+    // Excluded JARs (fast 1:1 aus deiner assembly.sbt übernommen,
+    // aber parametrisiert über dbxIncludedLibs/dbxShadedLibs)
+    assembly / assemblyExcludedJars := {
+
+      val log = streams.value.log
+      val cp = (assembly / fullClasspath).value
+
+      val DBR_libs = dbxIncludedLibs.map(m => (m.organization, m.name) -> m.revision).toMap
+      val toBeShaded_libs = dbxShadedLibs.value.map(m => (m.organization, m.name) -> m.revision).toMap
+
+      val project_libs = cp.map(_.get(moduleID.key).map { m => (m.organization, m.name) -> m.revision }.getOrElse(("", ""), "")).toMap
+
+      val excluded_dbr_libs = project_libs.filter { case (lib, rev) => DBR_libs.getOrElse(lib, "") == rev }
+      val excluded_shaded_libs = project_libs.filter { case (lib, rev) => toBeShaded_libs.getOrElse(lib, "") == rev }
+
+      val (kept_missmatch_libs, kept_good_libs) =
+        project_libs
+          .filterNot { case (lib, rev) => DBR_libs.getOrElse(lib, "") == rev }
+          .filterNot { case (lib, rev) => toBeShaded_libs.getOrElse(lib, "") == rev }
+          .partition { case (lib, _) => DBR_libs.contains(lib) || toBeShaded_libs.contains(lib) }
+
+      val finalExcludedJars = cp.filter(attr => attr.get(moduleID.key).exists { module => excluded_dbr_libs.contains((module.organization, module.name)) })
+
+      def logLibs(prefix: String, libs: Map[(String, String), String]): Unit =
+        libs.toSeq.sorted.map { case ((org, name), rev) => s"""$prefix "$org" % "$name" % "$rev"""" }.foreach(msg => log.info(msg))
+
+      logLibs("Excluded (part of DBR):", excluded_dbr_libs)
+      logLibs("Excluded (shaded):", excluded_shaded_libs)
+      logLibs("Included:", kept_good_libs)
+
+      if (kept_missmatch_libs.nonEmpty) {
+        kept_missmatch_libs.toSeq.sorted.foreach { case ((org, name), rev) =>
+          log.error(s"""Consider Shading or change dependencies: "$org" % "$name" % "$rev" - DBX rev  "${DBR_libs((org, name))}"""")
+        }
+        sys.error("Failing as we have conflicting versions.")
+      }
+
+      finalExcludedJars
+    },
+
+    // Merge-Strategie zentral im Plugin
+    assembly / assemblyMergeStrategy := {
+      case PathList("log4j2.properties") => MergeStrategy.discard
+
+      case PathList("META-INF", "services", _*)                 => MergeStrategy.concat
+      case PathList("ct", "dna", "shaded", "module-info.class") => MergeStrategy.discard
+      case PathList("ct", "dna", "shaded", "LICENSE")           => MergeStrategy.discard
+      case PathList("ct", "dna", "shaded", "NOTICE")            => MergeStrategy.discard
+      case PathList("ct", "dna", "shaded", "META-INF", _ @_*)   => MergeStrategy.discard
+      case PathList("module-info.class")                        => MergeStrategy.discard
+      case PathList("LICENSE")                                  => MergeStrategy.discard
+      case PathList("NOTICE")                                   => MergeStrategy.discard
+      case PathList("META-INF", _ @_*)                          => MergeStrategy.discard
+      case x                                                    => MergeStrategy.singleOrError
+    }
   )
 
-  lazy val includedLibs: Seq[ModuleID] = Seq(
-    "io.delta" % "delta-spark_2.13" % "4.0.0rc1",
-    "io.delta" % "delta-storage" % "4.0.0rc1",
-    "org.apache.spark" % "spark-common-utils_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-core_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-kvstore_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-launcher_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-network-common_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-network-shuffle_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-tags_2.13" % "4.0.0-preview2",
-    "org.apache.spark" % "spark-unsafe_2.13" % "4.0.0-preview2"
+  // adapted for DBR 17.3 LTS
+  lazy val dbxIncludedLibs: Seq[ModuleID] = Seq(
+    "io.delta" % "delta-spark_2.13" % "4.0.0",
+    "io.delta" % "delta-storage" % "4.0.0",
+    "org.apache.spark" % "spark-common-utils_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-core_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-sql_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-kvstore_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-launcher_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-network-common_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-network-shuffle_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-tags_2.13" % "4.0.0",
+    "org.apache.spark" % "spark-unsafe_2.13" % "4.0.0"
   ) ++ Seq(
     "antlr" % "antlr" % "2.7.7",
     "com.amazonaws" % "amazon-kinesis-client" % "1.12.0",
@@ -94,7 +149,7 @@ object DBX_Runtime_Assembly {
     "com.databricks" % "Rserve" % "1.8-3",
     "com.databricks" % "databricks-sdk-java" % "0.27.0",
     "com.databricks" % "jets3t" % "0.7.1-0",
-    "com.databricks.scalapb" % "scalapb-runtime_2.12" % "0.4.15-10",
+    "com.databricks.scalapb" % "scalapb-runtime_2.13" % "0.4.15-11",
     "com.esotericsoftware" % "kryo-shaded" % "4.0.3",
     "com.esotericsoftware" % "minlog" % "1.3.0",
     "com.fasterxml" % "classmate" % "1.5.1",
@@ -106,9 +161,9 @@ object DBX_Runtime_Assembly {
     "com.fasterxml.jackson.datatype" % "jackson-datatype-joda" % "2.18.2",
     "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.18.2",
     "com.fasterxml.jackson.module" % "jackson-module-paranamer" % "2.18.2",
-    "com.fasterxml.jackson.module" % "jackson-module-scala_2.12" % "2.18.2",
+    "com.fasterxml.jackson.module" % "jackson-module-scala_2.13" % "2.18.2",
     "com.github.ben-manes.caffeine" % "caffeine" % "2.9.3",
-    "com.github.blemale" % "scaffeine_2.12" % "5.2.1",
+    "com.github.blemale" % "scaffeine_2.13" % "4.1.0",
     "com.github.fommil" % "jniloader" % "1.1",
     "com.github.fommil.netlib" % "native_ref-java" % "1.1",
     "com.github.fommil.netlib" % "native_ref-java" % "1.1-natives",
@@ -134,28 +189,28 @@ object DBX_Runtime_Assembly {
     "com.helger" % "profiler" % "1.1.1",
     "com.ibm.icu" % "icu4j" % "75.1",
     "com.jcraft" % "jsch" % "0.1.55",
-    "com.lihaoyi" % "sourcecode_2.12" % "0.1.9",
+    "com.lihaoyi" % "sourcecode_2.13" % "0.1.9",
     "com.microsoft.azure" % "azure-data-lake-store-sdk" % "2.3.10",
-    "com.microsoft.sqlserver" % "mssql-jdbc" % "12.8.0.jre11",
-    "com.microsoft.sqlserver" % "mssql-jdbc" % "12.8.0.jre8",
+    "com.microsoft.sqlserver" % "mssql-jdbc" % "11.2.2.jre8",
+    "com.microsoft.sqlserver" % "mssql-jdbc" % "11.2.3.jre8",
     "com.ning" % "compress-lzf" % "1.1.2",
     "com.sun.mail" % "javax.mail" % "1.5.2",
     "com.sun.xml.bind" % "jaxb-core" % "2.2.11",
     "com.sun.xml.bind" % "jaxb-impl" % "2.2.11",
     "com.tdunning" % "json" % "1.8",
     "com.thoughtworks.paranamer" % "paranamer" % "2.8",
-    "com.trueaccord.lenses" % "lenses_2.12" % "0.4.12",
+    "com.trueaccord.lenses" % "lenses_2.13" % "0.4.13",
     "com.twitter" % "chill-java" % "0.10.0",
-    "com.twitter" % "chill_2.12" % "0.10.0",
-    "com.twitter" % "util-app_2.12" % "7.1.0",
-    "com.twitter" % "util-core_2.12" % "7.1.0",
-    "com.twitter" % "util-function_2.12" % "7.1.0",
-    "com.twitter" % "util-jvm_2.12" % "7.1.0",
-    "com.twitter" % "util-lint_2.12" % "7.1.0",
-    "com.twitter" % "util-registry_2.12" % "7.1.0",
-    "com.twitter" % "util-stats_2.12" % "7.1.0",
+    "com.twitter" % "chill_2.13" % "0.10.0",
+    "com.twitter" % "util-app_2.13" % "19.8.1",
+    "com.twitter" % "util-core_2.13" % "19.8.1",
+    "com.twitter" % "util-function_2.13" % "19.8.1",
+    "com.twitter" % "util-jvm_2.13" % "19.8.1",
+    "com.twitter" % "util-lint_2.13" % "19.8.1",
+    "com.twitter" % "util-registry_2.13" % "19.8.1",
+    "com.twitter" % "util-stats_2.13" % "19.8.1",
     "com.typesafe" % "config" % "1.4.3",
-    "com.typesafe.scala-logging" % "scala-logging_2.12" % "3.7.2",
+    "com.typesafe.scala-logging" % "scala-logging_2.13" % "3.9.2",
     "com.uber" % "h3" % "3.7.3",
     "com.univocity" % "univocity-parsers" % "2.9.1",
     "com.zaxxer" % "HikariCP" % "4.0.3",
@@ -175,7 +230,7 @@ object DBX_Runtime_Assembly {
     "dev.ludovic.netlib" % "lapack" % "3.0.3",
     "info.ganglia.gmetric4j" % "gmetric4j" % "1.0.10",
     "io.airlift" % "aircompressor" % "2.0.2",
-    "io.delta" % "delta-sharing-client_2.12" % "1.3.0",
+    "io.delta" % "delta-sharing-client_2.13" % "1.3.5",
     "io.dropwizard.metrics" % "metrics-annotation" % "4.2.30",
     "io.dropwizard.metrics" % "metrics-core" % "4.2.30",
     "io.dropwizard.metrics" % "metrics-graphite" % "4.2.30",
@@ -185,6 +240,7 @@ object DBX_Runtime_Assembly {
     "io.dropwizard.metrics" % "metrics-json" % "4.2.30",
     "io.dropwizard.metrics" % "metrics-jvm" % "4.2.30",
     "io.dropwizard.metrics" % "metrics-servlets" % "4.2.30",
+    "io.github.java-diff-utils" % "java-diff-utils" % "4.15",
     "io.netty" % "netty-all" % "4.1.118.Final",
     "io.netty" % "netty-buffer" % "4.1.118.Final",
     "io.netty" % "netty-codec" % "4.1.118.Final",
@@ -195,21 +251,23 @@ object DBX_Runtime_Assembly {
     "io.netty" % "netty-handler" % "4.1.118.Final",
     "io.netty" % "netty-handler-proxy" % "4.1.118.Final",
     "io.netty" % "netty-resolver" % "4.1.118.Final",
-    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-linux-aarch_64",
-    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-linux-x86_64",
-    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-osx-aarch_64",
-    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-osx-x86_64",
-    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-windows-x86_64",
+    "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final",
+    // "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-linux-aarch_64",
+    // "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-linux-x86_64",
+    // "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-osx-aarch_64",
+    // "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-osx-x86_64",
+    // "io.netty" % "netty-tcnative-boringssl-static" % "2.0.70.Final-db-r0-windows-x86_64",
     "io.netty" % "netty-tcnative-classes" % "2.0.70.Final",
     "io.netty" % "netty-transport" % "4.1.118.Final",
     "io.netty" % "netty-transport-classes-epoll" % "4.1.118.Final",
     "io.netty" % "netty-transport-classes-kqueue" % "4.1.118.Final",
     "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final",
-    "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final-linux-aarch_64",
-    "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final-linux-riscv64",
-    "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final-linux-x86_64",
-    "io.netty" % "netty-transport-native-kqueue" % "4.1.118.Final-osx-aarch_64",
-    "io.netty" % "netty-transport-native-kqueue" % "4.1.118.Final-osx-x86_64",
+    // "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final-linux-aarch_64",
+    // "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final-linux-riscv64",
+    // "io.netty" % "netty-transport-native-epoll" % "4.1.118.Final-linux-x86_64",
+    "io.netty" % "netty-transport-native-kqueue" % "4.1.118.Final",
+    // "io.netty" % "netty-transport-native-kqueue" % "4.1.118.Final-osx-aarch_64",
+    // "io.netty" % "netty-transport-native-kqueue" % "4.1.118.Final-osx-x86_64",
     "io.netty" % "netty-transport-native-unix-common" % "4.1.118.Final",
     "io.prometheus" % "simpleclient" % "0.16.1-databricks",
     "io.prometheus" % "simpleclient_common" % "0.16.1-databricks",
@@ -229,6 +287,7 @@ object DBX_Runtime_Assembly {
     "javax.annotation" % "javax.annotation-api" % "1.3.2",
     "javax.el" % "javax.el-api" % "2.2.4",
     "javax.jdo" % "jdo-api" % "3.0.1",
+    "javax.media" % "jai_core" % "jai_core_dummy",
     "javax.transaction" % "jta" % "1.1",
     "javax.transaction" % "transaction-api" % "1.1",
     "javax.xml.bind" % "jaxb-api" % "2.2.11",
@@ -265,7 +324,7 @@ object DBX_Runtime_Assembly {
     "org.apache.commons" % "commons-math3" % "3.6.1",
     "org.apache.commons" % "commons-text" % "1.13.0",
     "org.apache.curator" % "curator-client" % "5.7.1",
-    "org.apache.curator" % "curator-framwork_old" % "5.7.1",
+    "org.apache.curator" % "curator-framework" % "5.7.1",
     "org.apache.curator" % "curator-recipes" % "5.7.1",
     "org.apache.datasketches" % "datasketches-java" % "6.1.1",
     "org.apache.datasketches" % "datasketches-memory" % "3.0.2",
@@ -306,7 +365,7 @@ object DBX_Runtime_Assembly {
     "org.apache.yetus" % "audience-annotations" % "0.13.0",
     "org.apache.zookeeper" % "zookeeper" % "3.9.3",
     "org.apache.zookeeper" % "zookeeper-jute" % "3.9.3",
-    "org.checkerframwork_old" % "checker-qual" % "3.43.0",
+    "org.checkerframework" % "checker-qual" % "3.43.0",
     "org.codehaus.janino" % "commons-compiler" % "3.0.16",
     "org.codehaus.janino" % "janino" % "3.0.16",
     "org.datanucleus" % "datanucleus-api-jdo" % "4.2.4",
@@ -352,66 +411,68 @@ object DBX_Runtime_Assembly {
     "org.jboss.logging" % "jboss-logging" % "3.4.1.Final",
     "org.jdbi" % "jdbi" % "2.63.1",
     "org.jetbrains" % "annotations" % "17.0.0",
+    "org.jline" % "jline" % "3.27.1-jdk8",
     "org.joda" % "joda-convert" % "1.7",
     "org.jodd" % "jodd-core" % "3.5.2",
-    "org.json4s" % "json4s-ast_2.12" % "4.0.7",
-    "org.json4s" % "json4s-core_2.12" % "4.0.7",
-    "org.json4s" % "json4s-jackson-core_2.12" % "4.0.7",
-    "org.json4s" % "json4s-jackson_2.12" % "4.0.7",
-    "org.json4s" % "json4s-scalap_2.12" % "4.0.7",
+    "org.json4s" % "json4s-ast_2.13" % "4.0.7",
+    "org.json4s" % "json4s-core_2.13" % "4.0.7",
+    "org.json4s" % "json4s-jackson-core_2.13" % "4.0.7",
+    "org.json4s" % "json4s-jackson_2.13" % "4.0.7",
+    "org.json4s" % "json4s-scalap_2.13" % "4.0.7",
     "org.lz4" % "lz4-java" % "1.8.0-databricks-1",
-    "org.mlflow" % "mlflow-spark_2.12" % "2.9.1",
+    "org.mlflow" % "mlflow-spark_2.13" % "2.9.1",
     "org.objenesis" % "objenesis" % "3.3",
     "org.postgresql" % "postgresql" % "42.6.1",
     "org.roaringbitmap" % "RoaringBitmap" % "1.2.1",
     "org.rocksdb" % "rocksdbjni" % "9.8.4",
     "org.rosuda.REngine" % "REngine" % "2.1.0",
-    "org.scala-lang" % "scala-compiler_2.12" % "2.12.15",
-    "org.scala-lang" % "scala-library_2.12" % "2.12.15",
-    "org.scala-lang" % "scala-reflect_2.12" % "2.12.15",
-    "org.scala-lang.modules" % "scala-collection-compat_2.12" % "2.11.0",
-    "org.scala-lang.modules" % "scala-java8-compat_2.12" % "0.9.1",
-    "org.scala-lang.modules" % "scala-parser-combinators_2.12" % "2.4.0",
-    "org.scala-lang.modules" % "scala-xml_2.12" % "2.3.0",
+    "org.scala-lang" % "scala-compiler" % "2.13.16",
+    "org.scala-lang" % "scala-library" % "2.13.16",
+    "org.scala-lang" % "scala-reflect" % "2.13.16",
+    "org.scala-lang.modules" % "scala-collection-compat_2.13" % "2.11.0",
+    "org.scala-lang.modules" % "scala-java8-compat_2.13" % "0.9.1",
+    "org.scala-lang.modules" % "scala-parallel-collections_2.13" % "1.2.0",
+    "org.scala-lang.modules" % "scala-parser-combinators_2.13" % "2.4.0",
+    "org.scala-lang.modules" % "scala-xml_2.13" % "2.3.0",
     "org.scala-sbt" % "test-interface" % "1.0",
-    "org.scalacheck" % "scalacheck_2.12" % "1.18.0",
-    "org.scalactic" % "scalactic_2.12" % "3.2.19",
-    "org.scalanlp" % "breeze-macros_2.12" % "2.1.0",
-    "org.scalanlp" % "breeze_2.12" % "2.1.0",
+    "org.scalacheck" % "scalacheck_2.13" % "1.18.0",
+    "org.scalactic" % "scalactic_2.13" % "3.2.19",
+    "org.scalanlp" % "breeze-macros_2.13" % "2.1.0",
+    "org.scalanlp" % "breeze_2.13" % "2.1.0",
     "org.scalatest" % "scalatest-compatible" % "3.2.19",
-    "org.scalatest" % "scalatest-core_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-diagrams_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-featurespec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-flatspec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-freespec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-funspec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-funsuite_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-matchers-core_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-mustmatchers_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-propspec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-refspec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-shouldmatchers_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest-wordspec_2.12" % "3.2.19",
-    "org.scalatest" % "scalatest_2.12" % "3.2.19",
+    "org.scalatest" % "scalatest-core_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-diagrams_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-featurespec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-flatspec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-freespec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-funspec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-funsuite_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-matchers-core_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-mustmatchers_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-propspec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-refspec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-shouldmatchers_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest-wordspec_2.13" % "3.2.19",
+    "org.scalatest" % "scalatest_2.13" % "3.2.19",
     "org.slf4j" % "jcl-over-slf4j" % "2.0.16",
     "org.slf4j" % "jul-to-slf4j" % "2.0.16",
     "org.slf4j" % "slf4j-api" % "2.0.16",
     "org.slf4j" % "slf4j-simple" % "1.7.25",
     "org.threeten" % "threeten-extra" % "1.8.0",
     "org.tukaani" % "xz" % "1.10",
-    "org.typelevel" % "algebra_2.12" % "2.0.1",
-    "org.typelevel" % "cats-kernel_2.12" % "2.1.1",
-    "org.typelevel" % "spire-macros_2.12" % "0.17.0",
-    "org.typelevel" % "spire-platform_2.12" % "0.17.0",
-    "org.typelevel" % "spire-util_2.12" % "0.17.0",
-    "org.typelevel" % "spire_2.12" % "0.17.0",
+    "org.typelevel" % "algebra_2.13" % "2.8.0",
+    "org.typelevel" % "cats-kernel_2.13" % "2.8.0",
+    "org.typelevel" % "spire-macros_2.13" % "0.18.0",
+    "org.typelevel" % "spire-platform_2.13" % "0.18.0",
+    "org.typelevel" % "spire-util_2.13" % "0.18.0",
+    "org.typelevel" % "spire_2.13" % "0.18.0",
     "org.wildfly.openssl" % "wildfly-openssl" % "1.1.3.Final",
     "org.xerial" % "sqlite-jdbc" % "3.42.0.0",
     "org.xerial.snappy" % "snappy-java" % "1.1.10.3",
     "org.yaml" % "snakeyaml" % "2.0",
     "oro" % "oro" % "2.0.8",
     "pl.edu.icm" % "JLargeArrays" % "1.5",
-    "software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.4.1-linux-x86_64",
+    "software.amazon.cryptools" % "AmazonCorrettoCryptoProvider" % "2.5.0-linux-x86_64",
     "stax" % "stax-api" % "1.0.1"
   )
 

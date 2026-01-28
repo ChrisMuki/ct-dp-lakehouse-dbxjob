@@ -8,14 +8,21 @@ project/project**
 project/target**
 project/metals.sbt
 target/*
+*/target/*
 sbt-launch.jar
 # ignore sbt local files
 .bsp**
-# ignore local runtime config
-config/config.json
-# ignore pergola access key
-_pergola_access_key.zsh
-# ignore derby.log
-derby.log
-#ignore databricks logal files
-.databricks
+
+*/src/main/resources/log4j2.properties
+# ignore local test-config resources
+*/src/test/resources/test-config.json
+*/src/test/resources/test-config.json.*
+!*/src/test/resources/test-config.json.template
+
+# ignore secrets
+cicd/src/main/resources/deployment/configFiles/*.json
+!cicd/src/main/resources/deployment/configFiles/template.json
+
+# ignore databricks 
+.databricks/*
+.devcontainer/.proxy.env
