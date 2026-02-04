@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="ERROR" packages="com.databricks.logging.log4j,ct.dna.utils">
+  <Appenders>
+      
+    <Console name="console.always" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %p %c - %m%n" />
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Root level="ERROR">
+      <AppenderRef ref="console.always" />
+    </Root>
+    <Logger name="ct.dna" level="debug" additivity="false">
+      <AppenderRef ref="console.always" />
+    </Logger>
+  </Loggers>
+</Configuration>
