@@ -48,6 +48,7 @@ write_proxy_env() {
     echo "COURSIER_OPTS=-J-Dhttp.proxyHost=${host} -J-Dhttp.proxyPort=${port} -J-Dhttp.nonProxyHosts=${non_proxy_java} -J-Dhttps.proxyHost=${host} -J-Dhttps.proxyPort=${port} -J-Dhttps.nonProxyHosts=${non_proxy_java} -J-Djava.net.useSystemProxies=true" >> "$OUT_FILE"
 }
 
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
 if curl -s --head --request GET "$URL" >/dev/null; then
     echo "Container does not need a proxy"
