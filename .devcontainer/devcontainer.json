@@ -1,15 +1,13 @@
 {
-  "name": "Lakehouse",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "name": "DnA_17",
+  "image": "ctdsfacr.azurecr.io/devcontainer/full:latest",
   "runArgs": [
     "--env-file",
-    ".devcontainer/.proxy.env"
+    ".devcontainer/used.env"
   ],
-  "initializeCommand": "bash .devcontainer/scripts/gen_proxy_env.sh .devcontainer/.proxy.env",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
+  "initializeCommand": "/bin/bash -lc 'set -euo pipefail; if [ -f .devcontainer/custom.env ]; then cp -f .devcontainer/custom.env .devcontainer/used.env; else cp -f .devcontainer/default.env .devcontainer/used.env; fi'",
   "mounts": [
     "type=bind,source=${env:HOME},target=/home/vscode/host.home"
   ],
@@ -20,8 +18,6 @@
         // "terminal.integrated.defaultProfile.linux": "zsh",
         "metals.javaVersion": "17",
         "metals.fallbackScalaVersion": "2.13.16",
-        "metals.buildTool": "sbt",
-        "metals.bloopEnabled": false,
         "metals.serverProperties": [
           "-Xmx2G",
           "-XX:+UseZGC",
