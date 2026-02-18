@@ -1,13 +1,8 @@
 {
   "name": "DnA_17",
-  "image": "ctdsfacr.azurecr.io/devcontainer/full:latest",
-  "runArgs": [
-    "--env-file",
-    ".devcontainer/used.env"
-  ],
+  "image": "ctdsfacr.azurecr.io/devcontainer/sbt_java17:latest",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
-  "initializeCommand": "/bin/bash -lc 'set -euo pipefail; if [ -f .devcontainer/custom.env ]; then cp -f .devcontainer/custom.env .devcontainer/used.env; else cp -f .devcontainer/default.env .devcontainer/used.env; fi'",
   "mounts": [
     "type=bind,source=${env:HOME},target=/home/vscode/host.home"
   ],
