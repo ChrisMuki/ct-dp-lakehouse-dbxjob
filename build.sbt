@@ -37,7 +37,7 @@ ThisBuild / Test / parallelExecution := true
 
 lazy val lakehouse = project
   .in(file("lakehouse"))
-  .enablePlugins(AssemblyPlugin, DBX_ASSEMBLY_17_3)
+.enablePlugins(DbxAssemblyPlugin)
   .settings(
     name := "lakehouse",
     assembly / assemblyJarName := "lakehouse.jar",
@@ -56,10 +56,10 @@ lazy val lakehouse = project
 lazy val cicd = project
   .in(file("cicd"))
   .dependsOn(lakehouse)
-  .disablePlugins(AssemblyPlugin, DBX_ASSEMBLY_17_3)
+  .enablePlugins(JavaAppPackaging)
   .settings(
     name := "cicd",
-    assembly / assemblyJarName := "cicd.jar",
+    assembly / skip := true,
     libraryDependencies ++= Seq(
       "ct.dna" %% "deploy-utils" % "1.10.0",
       "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
@@ -70,7 +70,7 @@ lazy val cicd = project
 lazy val root = project
   .in(file("."))
   .aggregate(lakehouse, cicd)
-  .disablePlugins(AssemblyPlugin, DBX_ASSEMBLY_17_3)
   .settings(
+    assembly / skip := true,
     name := "multi-project-root"
   )

@@ -1,13 +1,6 @@
 {
-  "name": "Lakehouse",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
-  "runArgs": [
-    "--env-file",
-    ".devcontainer/.proxy.env"
-  ],
-  "initializeCommand": "bash .devcontainer/scripts/gen_proxy_env.sh .devcontainer/.proxy.env",
+  "name": "DnA_17",
+  "image": "ctdsfacr.azurecr.io/devcontainer/sbt_java17:latest",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
   "mounts": [
@@ -20,8 +13,6 @@
         // "terminal.integrated.defaultProfile.linux": "zsh",
         "metals.javaVersion": "17",
         "metals.fallbackScalaVersion": "2.13.16",
-        "metals.buildTool": "sbt",
-        "metals.bloopEnabled": false,
         "metals.serverProperties": [
           "-Xmx2G",
           "-XX:+UseZGC",
