@@ -1,0 +1,9 @@
+{
+    "rootDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/ct/dna/lakehouse",
+    "sparkConfig": {
+        "clazz": "RemoteDevLakehouse",
+        "workspaceUrl": "adb-3595568488992622.2.azuredatabricks.net",
+        "clusterId": "",
+        "pat": ""
+    }
+}

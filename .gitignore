@@ -26,3 +26,4 @@ cicd/src/main/resources/deployment/configFiles/*.json
 # ignore databricks 
 .databricks/*
 .devcontainer/.proxy.env
+lakehouse/src/test/resources/sync_sr_raw/*.json
