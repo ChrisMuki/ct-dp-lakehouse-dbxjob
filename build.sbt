@@ -43,12 +43,12 @@ lazy val lakehouse = project
     assembly / assemblyJarName := "lakehouse.jar",
     libraryDependencies ++= Seq(
       // DBR Runtime
-      "ct.dna" %% "dbx-runtime" % "1.1.0" % Provided,
+      "ct.dna" %% "dbx-runtime" % "17.3.0" % Provided,
       // Application Libs
-      "ct.dna" %% "common-utils" % "1.10.1",
-      "ct.dna" %% "lakehouse-core" % "1.13.1",
+      "ct.dna" %% "common-utils" % "1.13.0",
+      "ct.dna" %% "lakehouse-core" % "1.13.2",
       // Test only
-      "ct.dna" %% "local-spark-runtime" % "1.1.0" % Test,
+      "ct.dna" %% "local-spark-runtime" % "17.3.0" % Test,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )
   )
