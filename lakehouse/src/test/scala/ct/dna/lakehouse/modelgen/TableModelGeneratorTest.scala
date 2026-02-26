@@ -1,5 +1,9 @@
 package ct.dna.lakehouse.modelgen
 
+import ct.dna.lakehouse.core.catalog.CatalogFQN
+import ct.dna.lakehouse.core.catalog.SchemaFQN
+import ct.dna.lakehouse.core.catalog.TableDesc.UnityTableDesc
+import ct.dna.lakehouse.core.catalog.TableFQN
 import org.apache.spark.sql.types._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -75,5 +79,27 @@ class TableModelGeneratorTest extends AnyFunSuite {
     assert(generator.getDecimalAnnotation(DecimalType(15, 5)) == "@decimal(15, 5) ")
     assert(generator.getDecimalAnnotation(DecimalType(38, 10)) == "@decimal(38, 10) ")
     assert(generator.getDecimalAnnotation(DecimalType(20, 18)) == "@decimal(20, 18) ")
+  }
+
+  test("generateTableCode should use Joined for wide entities") {
+    val generator = new TableModelGenerator("ct.dna.test.model")
+    val tableFQN = TableFQN(SchemaFQN(CatalogFQN("test_catalog"), "test_schema"), "wide_table")
+    val fields = (1 to 130).map { index =>
+      StructField(s"col_$index", LongType, nullable = false)
+    }
+    val tableDesc = UnityTableDesc(
+      fqn = tableFQN,
+      schema = StructType(fields),
+      enableChangeDataFeed = true,
+      timetravelDays = 35,
+      pkColumns = Seq.empty,
+      clusterByAuto = true,
+      clusterByColumns = Seq.empty
+    )
+
+    val code = generator.generateTableCode("wide_table", tableDesc)
+    assert(code.contains("object wide_table extends TableSpec[Joined["))
+    assert(code.contains("@LakehouseEntity\ncase class Entity_wide_table_Part1"))
+    assert(!code.contains("case class Entity_wide_table("))
   }
 }

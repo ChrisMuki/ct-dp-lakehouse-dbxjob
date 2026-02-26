@@ -19,7 +19,7 @@ import ct.dna.utils.runtime.TaskEntryPoint
   * Create `sync-sr-raw.json`:
   * {{{
   * {
-  *     "outputDir": "/path/to/your/project/src/main/scala",
+  *     "rootDir": "/path/to/your/project/src/main/scala",
   *     "sparkConfig": {
   *         "clazz": "RemoteDevLakehouse",
   *         "workspaceUrl": "adb-xxx.xx.azuredatabricks.net",
@@ -41,7 +41,7 @@ import ct.dna.utils.runtime.TaskEntryPoint
   *
   * Generated files will be placed at:
   * {{{
-  * <outputDir>/
+  * <rootDir>/
   *   sr_raw/
   *     package.scala                    # package object sr_raw extends CatalogSpec
   *     <schema_name>/

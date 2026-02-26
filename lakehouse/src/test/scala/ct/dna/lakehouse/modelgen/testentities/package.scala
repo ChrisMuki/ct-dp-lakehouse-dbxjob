@@ -6,6 +6,7 @@ import ct.dna.lakehouse.core.model.Entity.clusterby
 import ct.dna.lakehouse.core.model.Entity.decimal
 import ct.dna.lakehouse.core.model.Entity.notnull
 import ct.dna.lakehouse.core.model.Entity.pk
+import org.apache.spark.sql.types._
 
 /** Test entity definitions for roundtrip code generation testing.
   *
@@ -179,5 +180,213 @@ package object testentities {
       @pk id: Long,
       data: Array[Byte]
   ) extends Entity
+
+  // ========== Large Hardcoded Entity (Roundtrip) ==========
+
+  case class BigEntity(
+      @pk id: Int,
+      col1: Long,
+      col2: Long,
+      col3: Long,
+      col4: Long,
+      col5: Long,
+      col6: Long,
+      col7: Long,
+      col8: Long,
+      col9: Long,
+      col10: Long,
+      col11: Long,
+      col12: Long,
+      col13: Long,
+      col14: Long,
+      col15: Long,
+      col16: Long,
+      col17: Long,
+      col18: Long,
+      col19: Long,
+      col20: Long
+  ) extends Entity
+
+  // ========== Large Hardcoded Entity (Joined) ==========
+
+  @LakehouseEntity
+  case class BigEntityPart1(
+      @pk id: Int,
+      col1: Long,
+      col2: Long,
+      col3: Long,
+      col4: Long,
+      col5: Long,
+      col6: Long,
+      col7: Long,
+      col8: Long,
+      col9: Long,
+      col10: Long,
+      col11: Long,
+      col12: Long,
+      col13: Long,
+      col14: Long,
+      col15: Long,
+      col16: Long,
+      col17: Long,
+      col18: Long,
+      col19: Long,
+      col20: Long,
+      col21: Long,
+      col22: Long,
+      col23: Long,
+      col24: Long,
+      col25: Long,
+      col26: Long,
+      col27: Long,
+      col28: Long,
+      col29: Long,
+      col30: Long,
+      col31: Long,
+      col32: Long,
+      col33: Long,
+      col34: Long,
+      col35: Long,
+      col36: Long,
+      col37: Long,
+      col38: Long,
+      col39: Long,
+      col40: Long,
+      col41: Long,
+      col42: Long,
+      col43: Long,
+      col44: Long,
+      col45: Long,
+      col46: Long,
+      col47: Long,
+      col48: Long,
+      col49: Long,
+      col50: Long,
+      col51: Long,
+      col52: Long,
+      col53: Long,
+      col54: Long,
+      col55: Long,
+      col56: Long,
+      col57: Long,
+      col58: Long,
+      col59: Long,
+      col60: Long,
+      col61: Long,
+      col62: Long,
+      col63: Long,
+      col64: Long
+  ) extends Entity
+
+  @LakehouseEntity
+  case class BigEntityPart2(
+      @pk col65: Long,
+      col66: Long,
+      col67: Long,
+      col68: Long,
+      col69: Long,
+      col70: Long,
+      col71: Long,
+      col72: Long,
+      col73: Long,
+      col74: Long,
+      col75: Long,
+      col76: Long,
+      col77: Long,
+      col78: Long,
+      col79: Long,
+      col80: Long,
+      col81: Long,
+      col82: Long,
+      col83: Long,
+      col84: Long,
+      col85: Long,
+      col86: Long,
+      col87: Long,
+      col88: Long,
+      col89: Long,
+      col90: Long,
+      col91: Long,
+      col92: Long,
+      col93: Long,
+      col94: Long,
+      col95: Long,
+      col96: Long,
+      col97: Long,
+      col98: Long,
+      col99: Long,
+      col100: Long,
+      col101: Long,
+      col102: Long,
+      col103: Long,
+      col104: Long,
+      col105: Long,
+      col106: Long,
+      col107: Long,
+      col108: Long,
+      col109: Long,
+      col110: Long,
+      col111: Long,
+      col112: Long,
+      col113: Long,
+      col114: Long,
+      col115: Long,
+      col116: Long,
+      col117: Long,
+      col118: Long,
+      col119: Long,
+      col120: Long,
+      col121: Long,
+      col122: Long,
+      col123: Long,
+      col124: Long,
+      col125: Long,
+      col126: Long,
+      col127: Long,
+      col128: Long,
+      col129: Long
+  ) extends Entity
+
+  type BigEntityJoined = Entity.Joined[BigEntityPart1, BigEntityPart2]
+
+  // Joined with matching PK names and types (merge should succeed)
+  @LakehouseEntity
+  case class BigEntityPart1MatchingPkOk(
+      @pk id: Int,
+      col1: Long
+  ) extends Entity
+
+  @LakehouseEntity
+  case class BigEntityPart2MatchingPkOk(
+      @pk id: Int,
+      col2: Long
+  ) extends Entity
+
+  type BigEntityJoinedMatchingPkOk = Entity.Joined[BigEntityPart1MatchingPkOk, BigEntityPart2MatchingPkOk]
+
+  // Joined with matching PK names but conflicting types (merge should fail)
+  @LakehouseEntity
+  case class BigEntityPart1MatchingPk(
+      @pk id: Int,
+      col1: Long
+  ) extends Entity
+
+  @LakehouseEntity
+  case class BigEntityPart2MatchingPk(
+      @pk id: Long,
+      col2: Long
+  ) extends Entity
+
+  type BigEntityJoinedMatchingPk = Entity.Joined[BigEntityPart1MatchingPk, BigEntityPart2MatchingPk]
+
+  object LargeEntityTestData {
+    def largeStructType(fieldCount: Int): StructType = {
+      val fields = (1 to fieldCount).map { index =>
+        val dataType = if (index % 2 == 0) LongType else DoubleType
+        StructField(s"col_$index", dataType, nullable = false)
+      }
+      StructType(fields)
+    }
+  }
 
 }

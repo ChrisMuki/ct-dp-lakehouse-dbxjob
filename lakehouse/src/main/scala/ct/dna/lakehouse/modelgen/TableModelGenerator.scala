@@ -34,6 +34,8 @@ import org.apache.spark.sql.types._
   */
 class TableModelGenerator(basePackage: String) extends LoggingTrait {
 
+  private val MaxParamSlots = 254
+
   /** Result of code generation containing all generated files
     */
   case class GeneratedFiles(
@@ -162,13 +164,17 @@ class TableModelGenerator(basePackage: String) extends LoggingTrait {
     sb.append(s"package $packageName\n\n")
 
     // Collect all needed imports (pk is added conditionally based on actual usage)
+    val tableDescriptions = tables.flatMap(readTableDescSafe)
+    val needsJoined = tableDescriptions.exists { case (tableFQN, tableDesc) =>
+      requiresJoined(tableFQN.name, tableDesc)
+    }
+
     val baseImports = Set(
       "ct.dna.lakehouse.core.framework.origin.Loaded",
+      "ct.dna.lakehouse.core.model.Entity",
       "ct.dna.lakehouse.core.model.Entity.LakehouseEntity",
       "ct.dna.lakehouse.core.model.TableSpec"
-    )
-
-    val tableDescriptions = tables.flatMap(readTableDescSafe)
+    ) ++ (if (needsJoined) Set("ct.dna.lakehouse.core.model.Entity.Joined") else Set.empty)
     val imports = collectImports(baseImports, tableDescriptions.map(_._2))
 
     // Write imports
@@ -181,9 +187,11 @@ class TableModelGenerator(basePackage: String) extends LoggingTrait {
     sb.append("// This file is auto-generated. Do not edit manually.\n\n")
 
     // Generate entity and tablespec for each table
-    tableDescriptions.foreach { case (tableFQN, tableDesc) =>
+    tableDescriptions.zipWithIndex.foreach { case ((tableFQN, tableDesc), index) =>
       sb.append(generateTableCode(tableFQN.name, tableDesc))
-      sb.append("\n")
+      if (index < tableDescriptions.size - 1) {
+        sb.append("\n")
+      }
     }
 
     sb.toString()
@@ -216,7 +224,7 @@ class TableModelGenerator(basePackage: String) extends LoggingTrait {
     */
   private[modelgen] def generateTableCode(tableName: String, tableDesc: TableDesc): String = {
     val entityName = safeIdentifier(s"Entity_$tableName")
-    val tableIdentifier = safeIdentifier(tableName)
+    val tableIdentifier = safeObjectIdentifier(tableName)
 
     val pkColumns = tableDesc match {
       case u: UnityTableDesc => u.pkColumns.toSet
@@ -243,27 +251,39 @@ class TableModelGenerator(basePackage: String) extends LoggingTrait {
       sb.append("\n)\n\n")
     }
 
-    // Entity case class with @LakehouseEntity annotation
-    sb.append(s"@LakehouseEntity\ncase class $entityName(\n")
-    val fields = tableDesc.schema.fields.map { field =>
-      val annotations = mutable.ListBuffer.empty[String]
-      if (pkColumns.contains(field.name)) annotations += "@pk"
-      if (clusterByColumns.contains(field.name)) annotations += "@clusterby"
-      // Only add @notnull for non-nullable, non-PK, non-primitive fields
-      // Scala primitives (Int, Long, etc.) are already non-nullable by nature
-      if (!field.nullable && !pkColumns.contains(field.name) && !isScalaPrimitive(field.dataType)) annotations += "@notnull"
-      // Add @decimal annotation for non-default precision/scale
-      getDecimalAnnotation(field.dataType) match {
-        case s if s.nonEmpty => annotations += s.trim
-        case _               => // no annotation needed
+    val fieldInfos = buildFieldInfos(tableName, tableDesc, nestedStructs)
+
+    val totalSlots = fieldInfos.map(_.slotCount).sum
+    val groupedFields = if (totalSlots > MaxParamSlots) {
+      val pkFields = fieldInfos.filter(_.isPk)
+      val pkSlots = pkFields.map(_.slotCount).sum
+      val maxSlots = Math.max(1, MaxParamSlots - pkSlots)
+      val baseGroups = groupFieldInfos(fieldInfos, maxSlots)
+      ensurePkFieldsPerGroup(baseGroups, pkFields)
+    } else Seq.empty
+
+    val entityTypeName = if (groupedFields.nonEmpty) {
+      val partClassNames = groupedFields.indices.map { index =>
+        safeIdentifier(s"Entity_${tableName}_Part${index + 1}")
       }
 
-      val annotationStr = if (annotations.nonEmpty) annotations.mkString(" ") + " " else ""
-      val scalaType = sparkTypeToScala(field.dataType, field.nullable, nestedStructs)
-      s"    $annotationStr${safeIdentifier(field.name)}: $scalaType"
+      groupedFields.zip(partClassNames).foreach { case (group, partClassName) =>
+        sb.append(s"@LakehouseEntity\ncase class $partClassName(\n")
+        sb.append(group.map(_.line).mkString(",\n"))
+        sb.append("\n) extends Entity\n\n")
+      }
+
+      val joinedType = partClassNames.reduceLeft { (left, right) =>
+        s"Joined[$left, $right]"
+      }
+      joinedType
+    } else {
+      // Entity case class with @LakehouseEntity annotation
+      sb.append(s"@LakehouseEntity\ncase class $entityName(\n")
+      sb.append(fieldInfos.map(_.line).mkString(",\n"))
+      sb.append("\n) extends Entity\n\n")
+      entityName
     }
-    sb.append(fields.mkString(",\n"))
-    sb.append("\n)\n\n")
 
     // TableSpec object
     val cdfEnabled = tableDesc.enableChangeDataFeed
@@ -282,7 +302,7 @@ class TableModelGenerator(basePackage: String) extends LoggingTrait {
 
     val paramsStr = if (tableSpecParams.nonEmpty) tableSpecParams.mkString("(", ", ", ")") else ""
 
-    sb.append(s"object $tableIdentifier extends TableSpec[$entityName]$paramsStr with Loaded\n")
+    sb.append(s"object $tableIdentifier extends TableSpec[$entityTypeName]$paramsStr with Loaded\n")
 
     sb.toString()
   }
@@ -494,6 +514,96 @@ class TableModelGenerator(basePackage: String) extends LoggingTrait {
     val sanitized = raw.replace('`', '_')
     val isValid = IdentifierPattern.pattern.matcher(sanitized).matches() && !ScalaKeywords.contains(sanitized)
     if (isValid) sanitized else s"`$sanitized`"
+  }
+
+  private def safeObjectIdentifier(raw: String): String = {
+    val base = safeIdentifier(raw)
+    if (base.startsWith("`") && base.endsWith("`")) {
+      val stripped = base.substring(1, base.length - 1)
+      val normalized = stripped.replaceAll("[^A-Za-z0-9_]", "_")
+      val startSafe = if (normalized.nonEmpty && (normalized.head.isLetter || normalized.head == '_')) normalized else s"_${normalized}"
+      if (ScalaKeywords.contains(startSafe)) s"${startSafe}_" else startSafe
+    } else {
+      base
+    }
+  }
+
+  private case class FieldInfo(name: String, line: String, scalaType: String, slotCount: Int, isPk: Boolean)
+
+  private def buildFieldInfos(
+      tableName: String,
+      tableDesc: TableDesc,
+      nestedStructs: mutable.LinkedHashMap[String, StructType]
+  ): IndexedSeq[FieldInfo] = {
+    val pkColumns = tableDesc match {
+      case u: UnityTableDesc => u.pkColumns.toSet
+      case _                 => Set.empty[String]
+    }
+
+    val clusterByColumns = tableDesc.clusterByColumns.toSet
+
+    tableDesc.schema.fields.toIndexedSeq.map { field =>
+      val annotations = mutable.ListBuffer.empty[String]
+      if (pkColumns.contains(field.name)) annotations += "@pk"
+      if (clusterByColumns.contains(field.name)) annotations += "@clusterby"
+      // Only add @notnull for non-nullable, non-PK, non-primitive fields
+      // Scala primitives (Int, Long, etc.) are already non-nullable by nature
+      if (!field.nullable && !pkColumns.contains(field.name) && !isScalaPrimitive(field.dataType)) annotations += "@notnull"
+      // Add @decimal annotation for non-default precision/scale
+      getDecimalAnnotation(field.dataType) match {
+        case s if s.nonEmpty => annotations += s.trim
+        case _               => // no annotation needed
+      }
+
+      val annotationStr = if (annotations.nonEmpty) annotations.mkString(" ") + " " else ""
+      val scalaType = sparkTypeToScala(field.dataType, field.nullable, nestedStructs)
+      val fieldLine = s"    $annotationStr${safeIdentifier(field.name)}: $scalaType"
+      val slotCount = paramSlotCount(scalaType)
+      FieldInfo(field.name, fieldLine, scalaType, slotCount, pkColumns.contains(field.name))
+    }
+  }
+
+  private def requiresJoined(tableName: String, tableDesc: TableDesc): Boolean = {
+    val nestedStructs = mutable.LinkedHashMap.empty[String, StructType]
+    collectNestedStructs(tableDesc.schema, tableName, nestedStructs)
+    val fieldInfos = buildFieldInfos(tableName, tableDesc, nestedStructs)
+    val totalSlots = fieldInfos.map(_.slotCount).sum
+    totalSlots > MaxParamSlots
+  }
+
+  private def paramSlotCount(scalaType: String): Int = scalaType match {
+    case "Long" | "Double" => 2
+    case _                 => 1
+  }
+
+  private def groupFieldInfos(fields: Seq[FieldInfo], maxSlots: Int): Seq[Seq[FieldInfo]] = {
+    val groups = mutable.ListBuffer.empty[Seq[FieldInfo]]
+    val current = mutable.ListBuffer.empty[FieldInfo]
+    var slots = 0
+
+    fields.foreach { field =>
+      val nextSlots = slots + field.slotCount
+      if (current.nonEmpty && nextSlots > maxSlots) {
+        groups += current.toList
+        current.clear()
+        slots = 0
+      }
+      current += field
+      slots += field.slotCount
+    }
+
+    if (current.nonEmpty) groups += current.toList
+    groups.toList
+  }
+
+  private def ensurePkFieldsPerGroup(groups: Seq[Seq[FieldInfo]], pkFields: Seq[FieldInfo]): Seq[Seq[FieldInfo]] = {
+    if (pkFields.isEmpty) return groups
+
+    groups.map { group =>
+      val existing = group.map(_.name).toSet
+      val missingPk = pkFields.filterNot(f => existing.contains(f.name))
+      if (missingPk.isEmpty) group else missingPk ++ group
+    }
   }
 
   // ========== Print Methods (Console Output) ==========

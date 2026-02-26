@@ -46,7 +46,7 @@ lazy val lakehouse = project
       "ct.dna" %% "dbx-runtime" % "1.1.0" % Provided,
       // Application Libs
       "ct.dna" %% "common-utils" % "1.10.1",
-      "ct.dna" %% "lakehouse-core" % "1.10.2",
+      "ct.dna" %% "lakehouse-core" % "1.13.1",
       // Test only
       "ct.dna" %% "local-spark-runtime" % "1.1.0" % Test,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test

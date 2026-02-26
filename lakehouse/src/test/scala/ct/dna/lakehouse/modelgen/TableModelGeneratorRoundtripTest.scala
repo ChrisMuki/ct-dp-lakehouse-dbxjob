@@ -219,6 +219,35 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
     println(s"${"=" * 80}\n")
   }
 
+  private def verifyJoinedLargeEntity(entityName: String, schema: StructType): Unit = {
+    val tableFQN = TableFQN(SchemaFQN(CatalogFQN(testCatalog), testSchema), entityName)
+    val tableDesc = UnityTableDesc(
+      fqn = tableFQN,
+      schema = schema,
+      enableChangeDataFeed = true,
+      timetravelDays = 35,
+      pkColumns = Seq.empty,
+      clusterByAuto = true,
+      clusterByColumns = Seq.empty
+    )
+
+    val generatedCode = generator.generateTableCode(entityName, tableDesc)
+    val partTypes = parseJoinedTypeFromTableSpec(generatedCode, entityName)
+    assert(partTypes.nonEmpty, "Expected joined entity to have at least one part")
+
+    val flattened = partTypes.flatMap { partType =>
+      val partFields = parseCaseClassFields(generatedCode, partType)
+      val slots = partFields.map(fieldSlotCount).sum
+      assert(slots <= 254, s"Part '$partType' exceeds parameter slot limit: $slots")
+      partFields
+    }
+
+    assert(
+      flattened.map(_.name) == schema.fieldNames.toSeq,
+      s"Grouped fields do not match schema fields. Expected=${schema.fieldNames.mkString(", ")}, got=${flattened.map(_.name).mkString(", ")}"
+    )
+  }
+
   // ========== Tests ==========
 
   // Basic entities
@@ -256,6 +285,123 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
   // Binary
   test("roundtrip: BinaryData") { verifyRoundtrip[BinaryData]("binary_data") }
 
+  // Large hardcoded entity
+  test("roundtrip: BigEntity") { verifyRoundtrip[BigEntity]("big_entity") }
+
+  test("roundtrip: BigEntityJoined") {
+    val pkColumns = (Entity.keyNames[BigEntityPart1] ++ Entity.keyNames[BigEntityPart2]).toSet
+    val originalStructType = Entity.structType[BigEntityJoined]
+    val clusterByColumns = extractClusterByFromMetadata(originalStructType)
+
+    val tableFQN = TableFQN(SchemaFQN(CatalogFQN(testCatalog), testSchema), "big_entity_joined")
+    val tableDesc = UnityTableDesc(
+      fqn = tableFQN,
+      schema = originalStructType,
+      enableChangeDataFeed = true,
+      timetravelDays = 35,
+      pkColumns = pkColumns.toSeq,
+      clusterByAuto = clusterByColumns.isEmpty,
+      clusterByColumns = clusterByColumns
+    )
+
+    val generatedCode = generator.generateTableCode("big_entity_joined", tableDesc)
+    val partTypes = parseJoinedTypeFromTableSpec(generatedCode, "big_entity_joined")
+    assert(partTypes.nonEmpty, "Expected joined entity to have at least one part")
+    val generatedFields = {
+      val merged = scala.collection.mutable.LinkedHashMap.empty[String, GeneratedField]
+      partTypes
+        .flatMap(parseCaseClassFields(generatedCode, _))
+        .foreach { field =>
+          if (!merged.contains(field.name)) merged(field.name) = field
+        }
+      merged.values.toSeq
+    }
+
+    assert(
+      generatedFields.size == originalStructType.fields.length,
+      s"Field count mismatch: expected ${originalStructType.fields.length}, got ${generatedFields.size}\n" +
+        s"Expected: ${originalStructType.fieldNames.mkString(", ")}\n" +
+        s"Generated: ${generatedFields.map(_.name).mkString(", ")}"
+    )
+
+    originalStructType.fields.zip(generatedFields).foreach { case (expectedField, generatedField) =>
+      assert(
+        generatedField.name == expectedField.name,
+        s"Field name mismatch: expected '${expectedField.name}', got '${generatedField.name}'"
+      )
+
+      val isPk = pkColumns.contains(expectedField.name)
+      val isClusterBy = clusterByColumns.contains(expectedField.name)
+      val expectNotnull = !expectedField.nullable && !isPk && !generator.isScalaPrimitive(expectedField.dataType)
+
+      assert(
+        generatedField.hasPk == isPk,
+        s"Field '${expectedField.name}': @pk mismatch - expected $isPk, got ${generatedField.hasPk}"
+      )
+
+      assert(
+        generatedField.hasClusterBy == isClusterBy,
+        s"Field '${expectedField.name}': @clusterby mismatch - expected $isClusterBy, got ${generatedField.hasClusterBy}"
+      )
+
+      assert(
+        generatedField.hasNotnull == expectNotnull,
+        s"Field '${expectedField.name}': @notnull mismatch - expected $expectNotnull, got ${generatedField.hasNotnull}"
+      )
+
+      val expectedDecimal = expectedField.dataType match {
+        case d: DecimalType if d.precision != 38 || d.scale != 18 => Some((d.precision, d.scale))
+        case _                                                    => None
+      }
+      assert(
+        generatedField.decimalInfo == expectedDecimal,
+        s"Field '${expectedField.name}': @decimal mismatch - expected $expectedDecimal, got ${generatedField.decimalInfo}"
+      )
+    }
+  }
+
+  test("joined: BigEntityJoined keyNames fails") {
+    intercept[MatchError] {
+      Entity.keyNames[BigEntityJoined]
+    }
+  }
+
+  test("joined: BigEntityJoined matching PK conflicts") {
+    intercept[Exception] {
+      Entity.structType[BigEntityJoinedMatchingPk]
+    }
+  }
+
+  test("joined: BigEntityJoined matching PK succeeds") {
+    val structType = Entity.structType[BigEntityJoinedMatchingPkOk]
+    assert(structType.fieldNames.contains("id"))
+  }
+
+  // Joined entity code generation
+  test("joined: BigEntity") {
+    val originalStructType = Entity.structType[BigEntityJoined]
+    val tableFQN = TableFQN(SchemaFQN(CatalogFQN(testCatalog), testSchema), "big_entity")
+    val tableDesc = UnityTableDesc(
+      fqn = tableFQN,
+      schema = originalStructType,
+      enableChangeDataFeed = true,
+      timetravelDays = 35,
+      pkColumns = Seq.empty,
+      clusterByAuto = true,
+      clusterByColumns = Seq.empty
+    )
+
+    val generatedCode = generator.generateTableCode("big_entity", tableDesc)
+    val partTypes = parseJoinedTypeFromTableSpec(generatedCode, "big_entity")
+    assert(partTypes == Seq("Entity_big_entity_Part1", "Entity_big_entity_Part2"))
+  }
+
+  // Grouping for large entities
+  test("joined: LargeEntity") {
+    val schema = LargeEntityTestData.largeStructType(130)
+    verifyJoinedLargeEntity("large_entity", schema)
+  }
+
   // ========== Full Comparison Tests (run with: VERBOSE=true) ==========
 
   test("full comparison: show all entities") {
@@ -264,6 +410,7 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
     printFullComparison[Decimals]("decimals")
     printFullComparison[Colls]("colls")
     printFullComparison[Mixed]("mixed")
+    printFullComparison[BigEntity]("big_entity")
   }
 
   // ========== Helper Methods ==========
@@ -280,12 +427,27 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
   /** Parse generated Entity code to extract field definitions */
   private def parseGeneratedEntityFields(code: String, entityName: String): Seq[GeneratedField] = {
     // Extract entity body - handle nested parentheses (e.g., @decimal(15, 1))
-    val entityBody = extractEntityBody(code, entityName).getOrElse {
-      fail(s"Could not find @LakehouseEntity case class $entityName in generated code:\n$code")
+    extractEntityBody(code, entityName) match {
+      case Some(entityBody) => parseFieldsFromBody(entityBody)
+      case None =>
+        val partTypes = parseJoinedTypeAlias(code, entityName)
+        if (partTypes.isEmpty) {
+          fail(s"Could not find @LakehouseEntity case class $entityName or a Joined alias in generated code:\n$code")
+        }
+        partTypes.flatMap(parseCaseClassFields(code, _))
     }
+  }
 
+  private def parseCaseClassFields(code: String, className: String): Seq[GeneratedField] = {
+    val classBody = extractCaseClassBody(code, className).getOrElse {
+      fail(s"Could not find case class $className in generated code:\n$code")
+    }
+    parseFieldsFromBody(classBody)
+  }
+
+  private def parseFieldsFromBody(body: String): Seq[GeneratedField] = {
     // Split by comma, but not commas inside parentheses or brackets
-    val fields = splitFieldsBalanced(entityBody)
+    val fields = splitFieldsBalanced(body)
 
     val fieldPattern = """^\s*((?:@\w+(?:\([^)]*\))?\s*)*)\s*(\w+):\s*(.+?)\s*$""".r
 
@@ -328,6 +490,106 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
     if (depth == 0) Some(code.substring(bodyStart, i - 1)) else None
   }
 
+  private def extractCaseClassBody(code: String, className: String): Option[String] = {
+    val marker = s"case class $className("
+    val startIdx = code.indexOf(marker)
+    if (startIdx < 0) return None
+
+    val bodyStart = startIdx + marker.length
+    var depth = 1
+    var i = bodyStart
+    while (i < code.length && depth > 0) {
+      code.charAt(i) match {
+        case '(' => depth += 1
+        case ')' => depth -= 1
+        case _   =>
+      }
+      i += 1
+    }
+    if (depth == 0) Some(code.substring(bodyStart, i - 1)) else None
+  }
+
+  private def parseJoinedTypeAlias(code: String, entityName: String): Seq[String] = {
+    val pattern = ("(?m)^\\s*type\\s+" + java.util.regex.Pattern.quote(entityName) + "\\s*=\\s*(.+)\\s*$").r
+    val joinedType = pattern.findFirstMatchIn(code).map(_.group(1).trim).getOrElse("")
+    if (joinedType.isEmpty) Seq.empty else parseJoinedTypes(joinedType)
+  }
+
+  private def parseJoinedTypeFromTableSpec(code: String, tableName: String): Seq[String] = {
+    val marker = s"object $tableName extends TableSpec["
+    val startIdx = code.indexOf(marker)
+    if (startIdx < 0) return Seq.empty
+
+    val typeStart = startIdx + marker.length
+    val typeExpr = extractBracketedFromIndex(code, typeStart)
+    if (typeExpr.isEmpty) Seq.empty else parseJoinedTypes(typeExpr)
+  }
+
+  private def extractBracketedFromIndex(code: String, start: Int): String = {
+    var depth = 1
+    var i = start
+    while (i < code.length && depth > 0) {
+      code.charAt(i) match {
+        case '[' => depth += 1
+        case ']' => depth -= 1
+        case _   =>
+      }
+      i += 1
+    }
+    if (depth == 0) code.substring(start, i - 1) else ""
+  }
+
+  private def parseJoinedTypes(typeExpr: String): Seq[String] = {
+    val trimmed = typeExpr.trim
+    if (!trimmed.startsWith("Joined[")) return Seq(trimmed)
+
+    val inner = extractBracketed(trimmed, "Joined[")
+    val parts = splitTypesBalanced(inner)
+    if (parts.size != 2) fail(s"Expected Joined to have two type params, got: '$inner'")
+    parseJoinedTypes(parts.head) ++ parseJoinedTypes(parts.last)
+  }
+
+  private def extractBracketed(s: String, prefix: String): String = {
+    val startIdx = s.indexOf(prefix)
+    if (startIdx != 0) fail(s"Expected '$prefix' at start of '$s'")
+    val bodyStart = prefix.length
+    var depth = 1
+    var i = bodyStart
+    while (i < s.length && depth > 0) {
+      s.charAt(i) match {
+        case '[' => depth += 1
+        case ']' => depth -= 1
+        case _   =>
+      }
+      i += 1
+    }
+    if (depth == 0) s.substring(bodyStart, i - 1) else fail(s"Unbalanced brackets in '$s'")
+  }
+
+  private def splitTypesBalanced(s: String): Seq[String] = {
+    val result = scala.collection.mutable.ListBuffer.empty[String]
+    val current = new StringBuilder
+    var depth = 0
+
+    for (c <- s) {
+      c match {
+        case '[' =>
+          depth += 1
+          current.append(c)
+        case ']' =>
+          depth -= 1
+          current.append(c)
+        case ',' if depth == 0 =>
+          result += current.toString().trim
+          current.clear()
+        case _ =>
+          current.append(c)
+      }
+    }
+    if (current.nonEmpty) result += current.toString().trim
+    result.toSeq
+  }
+
   /** Split by comma, respecting balanced parentheses and brackets */
   private def splitFieldsBalanced(s: String): Seq[String] = {
     val result = scala.collection.mutable.ListBuffer.empty[String]
@@ -359,6 +621,11 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
     }
   }
 
+  private def fieldSlotCount(field: GeneratedField): Int = field.scalaType match {
+    case "Long" | "Double" => 2
+    case _                 => 1
+  }
+
   case class GeneratedField(
       name: String,
       scalaType: String,
@@ -367,4 +634,5 @@ class TableModelGeneratorRoundtripTest extends AnyFunSuite {
       hasClusterBy: Boolean,
       decimalInfo: Option[(Int, Int)]
   )
+
 }
