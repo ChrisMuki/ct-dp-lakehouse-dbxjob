@@ -20,10 +20,11 @@ sbt-launch.jar
 !*/src/test/resources/test-config.json.template
 
 # ignore secrets
+cicd/src/main/resources/*.json
 cicd/src/main/resources/deployment/configFiles/*.json
 !cicd/src/main/resources/deployment/configFiles/template.json
 
 # ignore databricks 
 .databricks/*
-.devcontainer/.proxy.env
-lakehouse/src/test/resources/sync_sr_raw/*.json
+
+

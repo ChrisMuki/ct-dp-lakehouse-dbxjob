@@ -1,0 +1,14 @@
+{
+    "sparkConfig": {
+        "stage": "dev",
+        "clazz": "RemoteLakehouse",
+        "workspaceUrl": "adb-3595568488992622.2.azuredatabricks.net",
+        "clusterId": "0606-200414-edjwnp08",
+        "pat": ""
+    },
+    "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/ct/dna/lakehouse",
+    "basePackage": "ct.dna.lakehouse",
+    "catalogId": {
+        "name": "sr_raw"
+    }
+}

@@ -14,8 +14,6 @@ ThisBuild / credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 ThisBuild / javaOptions ++= Seq(
   "-Xms1g",
   "-Xmx8g",
-  "-Xms1g",
-  "-Xmx8g",
   "-Xss4M",
   "-XX:ReservedCodeCacheSize=128m",
   "--add-opens=java.base/java.nio=ALL-UNNAMED",
@@ -37,7 +35,7 @@ ThisBuild / Test / parallelExecution := true
 
 lazy val lakehouse = project
   .in(file("lakehouse"))
-.enablePlugins(DbxAssemblyPlugin)
+  .enablePlugins(DbxAssemblyPlugin)
   .settings(
     name := "lakehouse",
     assembly / assemblyJarName := "lakehouse.jar",
@@ -45,8 +43,9 @@ lazy val lakehouse = project
       // DBR Runtime
       "ct.dna" %% "dbx-runtime" % "17.3.0" % Provided,
       // Application Libs
-      "ct.dna" %% "common-utils" % "1.13.0",
-      "ct.dna" %% "lakehouse-core" % "1.13.2",
+      "ct.dna" %% "common-utils" % "1.14.0",
+      "ct.dna" %% "dataplatform-core" % "1.15.1",
+      "ct.dna" %% "lakehouse-core" % "1.17.1",
       // Test only
       "ct.dna" %% "local-spark-runtime" % "17.3.0" % Test,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
@@ -59,10 +58,12 @@ lazy val cicd = project
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "cicd",
+    run / fork := true,
     assembly / skip := true,
     libraryDependencies ++= Seq(
-      "ct.dna" %% "deploy-utils" % "1.10.0",
-      "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
+      "ct.dna" %% "deploy-utils" % "1.11.0",
+      "ct.dna" %% "lakehouse-modelbuilder" % "1.0.1",
+      "ct.dna" %% "local-spark-runtime" % "17.3.0",
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )
   )
