@@ -5,3 +5,9 @@ resolvers += "Artifactory Realm" at "https://artifacts.ws.contitech.cloud/artifa
 credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 addSbtPlugin("ct.dna" % "dna-build-tools" % "17.3.1")
 addDependencyTreePlugin
+
+// Align eviction checking with mixed transitive plugin ecosystem in sbt meta-build.
+ThisBuild / libraryDependencySchemes ++= Seq(
+	"org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always,
+	"org.scala-lang.modules" %% "scala-parser-combinators" % VersionScheme.Always
+)

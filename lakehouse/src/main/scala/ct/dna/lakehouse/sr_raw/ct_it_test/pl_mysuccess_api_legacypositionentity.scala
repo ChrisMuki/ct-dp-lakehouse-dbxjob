@@ -4,31 +4,39 @@ import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.Entity._
 import ct.dna.lakehouse.core.model.TableSpec
 
+
 @LakehouseEntity
 case class pl_mysuccess_api_legacypositionentity_E(
-    @PK _mk_org: String,
-    @PK _mk_site: String,
-    @PK _mk_system: String,
-    @PK _mk_instance: String,
-    @PK _mk_partition: String,
-    @PK _mk_file: String,
-    @NotNull _mk_container: String,
-    @NotNull _mk_account: String,
-    @NotNull _mk_created_at: Timestamp,
-    @PK _lh_id_in_message: Long,
-    _lh_ingest_warning: String,
-    positionid_string: String,
-    title_string: String,
-    contains_masked_personal_data_boolean: BoxedBoolean,
-    incumbent_string: String,
-    createdate_string: String,
-    positioncode_string: String
+  @PK _mk_org: String,
+  @PK _mk_site: String,
+  @PK _mk_system: String,
+  @PK _mk_instance: String,
+  @PK _mk_partition: String,
+  @PK _mk_file: String,
+  @NotNull _mk_container: String,
+  @NotNull _mk_account: String,
+  @NotNull _mk_created_at: Timestamp,
+  @PK _lh_id_in_message: Long,
+  _lh_ingest_warning: String,
+  positionid_string: String,
+  title_string: String,
+  contains_masked_personal_data_boolean: BoxedBoolean,
+  incumbent_string: String,
+  createdate_string: String,
+  positioncode_string: String,
+  status_long: BoxedLong,
+  readiness_string: String,
+  lastmodifiedby_string: String,
+  id_string: String,
+  lastmodifieddatetime_string: String,
+  nomineeuserid_string: String,
+  readinesslabel_string: String,
+  rank_long: BoxedLong,
+  statuslabel_string: String
 ) extends Entity
 
-object pl_mysuccess_api_legacypositionentity
-    extends TableSpec[pl_mysuccess_api_legacypositionentity_E](
-      enableChangeDataFeed = true,
-      manualClusterBy = None,
-      timetravelDays = 35
-    )
-    with Loaded
+object pl_mysuccess_api_legacypositionentity extends TableSpec[pl_mysuccess_api_legacypositionentity_E](
+  enableChangeDataFeed = true,
+  manualClusterBy = None,
+  timetravelDays = 35
+) with Loaded

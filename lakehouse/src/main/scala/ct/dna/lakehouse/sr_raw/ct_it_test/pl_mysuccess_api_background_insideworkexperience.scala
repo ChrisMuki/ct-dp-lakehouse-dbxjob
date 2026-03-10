@@ -4,43 +4,42 @@ import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.Entity._
 import ct.dna.lakehouse.core.model.TableSpec
 
+
 @LakehouseEntity
 case class pl_mysuccess_api_background_insideworkexperience_E(
-    @PK _mk_org: String,
-    @PK _mk_site: String,
-    @PK _mk_system: String,
-    @PK _mk_instance: String,
-    @PK _mk_partition: String,
-    @PK _mk_file: String,
-    @NotNull _mk_container: String,
-    @NotNull _mk_account: String,
-    @NotNull _mk_created_at: Timestamp,
-    @PK _lh_id_in_message: Long,
-    _lh_ingest_warning: String,
-    startdate_string: String,
-    title_string: String,
-    country_string: String,
-    lead_level_string: String,
-    organisation_string: String,
-    userid_string: String,
-    contains_masked_personal_data_boolean: BoxedBoolean,
-    location_string: String,
-    international_string: String,
-    functionalarea_string: String,
-    enddate_string: String,
-    division_string: String,
-    employer_string: String,
-    bgorderpos_string: String,
-    intdescmaintasks_string: String,
-    lastmodifieddate_string: String,
-    backgroundelementid_string: String,
-    comments_string: String
+  @PK _mk_org: String,
+  @PK _mk_site: String,
+  @PK _mk_system: String,
+  @PK _mk_instance: String,
+  @PK _mk_partition: String,
+  @PK _mk_file: String,
+  @NotNull _mk_container: String,
+  @NotNull _mk_account: String,
+  @NotNull _mk_created_at: Timestamp,
+  @PK _lh_id_in_message: Long,
+  _lh_ingest_warning: String,
+  startdate_string: String,
+  title_string: String,
+  country_string: String,
+  lead_level_string: String,
+  organisation_string: String,
+  userid_string: String,
+  contains_masked_personal_data_boolean: BoxedBoolean,
+  location_string: String,
+  international_string: String,
+  functionalarea_string: String,
+  enddate_string: String,
+  division_string: String,
+  employer_string: String,
+  bgorderpos_string: String,
+  intdescmaintasks_string: String,
+  lastmodifieddate_string: String,
+  backgroundelementid_string: String,
+  comments_string: String
 ) extends Entity
 
-object pl_mysuccess_api_background_insideworkexperience
-    extends TableSpec[pl_mysuccess_api_background_insideworkexperience_E](
-      enableChangeDataFeed = true,
-      manualClusterBy = None,
-      timetravelDays = 35
-    )
-    with Loaded
+object pl_mysuccess_api_background_insideworkexperience extends TableSpec[pl_mysuccess_api_background_insideworkexperience_E](
+  enableChangeDataFeed = true,
+  manualClusterBy = None,
+  timetravelDays = 35
+) with Loaded

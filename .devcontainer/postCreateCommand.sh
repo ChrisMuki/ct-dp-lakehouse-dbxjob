@@ -1,18 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-####################
-##### Clean up #####
-####################
-echo "Cleaning up old build artifacts..."
-rm -rf .bloop
-rm -rf .metals
-rm -rf .vscode
-rm -rf project/project/
-rm -rf project/target/
-rm -rf project/metals.sbt
-rm -rf target/
-
 
 ####################
 #### sbt config ####
@@ -28,12 +16,6 @@ if [[ -f "$SBT_CRED_SOURCE" ]]; then
 else
   echo "No sbt credentials found at $SBT_CRED_SOURCE, skipping copy."
 fi
-
-
-####################
-##### sbt init #####
-####################
-(sbt --batch reload || true)
 
 
 ####################

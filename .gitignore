@@ -2,6 +2,7 @@
 # ignore macOS local files
 .DS_Store
 # ignore vscode and metals local files
+.bloop**
 .metals**
 .vscode**
 project/project**
