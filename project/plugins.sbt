@@ -1,13 +1,5 @@
-addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.9.4")
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.13.0")
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.0")
-resolvers += "Artifactory Realm" at "https://artifacts.ws.contitech.cloud/artifactory/ctdna-sbt"
-credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
-addSbtPlugin("ct.dna" % "dna-build-tools" % "17.3.1")
-addDependencyTreePlugin
-
-// Align eviction checking with mixed transitive plugin ecosystem in sbt meta-build.
-ThisBuild / libraryDependencySchemes ++= Seq(
-	"org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always,
-	"org.scala-lang.modules" %% "scala-parser-combinators" % VersionScheme.Always
-)
+// Local-only sbt plugins for this workstation.
+// Keep shared/team plugins in project/dna-plugins.sbt.
+//
+// Example:
+// addSbtPlugin("org.scoverage" % "sbt-scoverage" % "<version>")

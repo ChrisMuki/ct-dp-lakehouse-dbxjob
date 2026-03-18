@@ -1,0 +1,403 @@
+// AUTO GENERATED CODE - DO NOT EDIT
+package ct.dna.lakehouse.catalog.sr_raw.ct_gbl_p69
+
+import ct.dna.lakehouse.core.framework.origin.Loaded
+import ct.dna.lakehouse.core.model.Entity
+import ct.dna.lakehouse.core.model.Entity._
+import ct.dna.lakehouse.core.model.TableSpec
+
+case class E_reguh(
+    @PK _mk_org: String,
+    @PK _mk_site: String,
+    @PK _mk_system: String,
+    @PK _mk_instance: String,
+    @PK _mk_partition: String,
+    @PK _mk_file: String,
+    @NotNull _mk_container: String,
+    @NotNull _mk_account: String,
+    @NotNull _mk_created_at: Timestamp,
+    @PK _lh_id_in_message: Long,
+    _lh_ingest_warning: String,
+    znme3_string: String,
+    xvorl_string: String,
+    bnkn2_string: String,
+    dtams_string: String,
+    ubnky_string: String,
+    srtf1_string: String,
+    zpst2_string: String,
+    idoc_num_string: String,
+    purp_code_string: String,
+    znme4_string: String,
+    wefae_string: String,
+    seq_type_string: String,
+    @Decimal(3, 0) weamx_decimal_3_0: BigDecimal,
+    saknr_string: String,
+    srtf3_string: String,
+    fpm_key_string: String,
+    @Decimal(13, 2) rbetr_decimal_13_2: BigDecimal,
+    xavis_string: String,
+    @Decimal(13, 2) rwbtr_decimal_13_2: BigDecimal,
+    pfach_string: String,
+    avisg_string: String,
+    zregi_string: String,
+    btyp1_string: String,
+    bnkn1_string: String,
+    xcorr_string: String,
+    dtws1_string: String,
+    name3_string: String,
+    zbvty_string: String,
+    wevwv_string: String,
+    srtbp_string: String,
+    text_string: String,
+    bnks1_string: String,
+    bnks2_string: String,
+    bnks3_string: String,
+    @Decimal(13, 2) rbet2_decimal_13_2: BigDecimal,
+    name1_string: String,
+    bkon1_string: String,
+    vblnr_string: String,
+    stcd1_string: String,
+    regio_string: String,
+    wdate_string: String,
+    @Decimal(11, 2) rspm1_decimal_11_2: BigDecimal,
+    busab_string: String,
+    @Decimal(13, 2) wehrs_decimal_13_2: BigDecimal,
+    bnkl2_string: String,
+    xaend_string: String,
+    bkrf2_string: String,
+    hktiw_string: String,
+    ziban_string: String,
+    zstra_string: String,
+    uzawe_string: String,
+    @Decimal(13, 2) dskvh_decimal_13_2: BigDecimal,
+    @Decimal(13, 2) wefrs_decimal_13_2: BigDecimal,
+    @Decimal(13, 2) skvhw_decimal_13_2: BigDecimal,
+    xsiwe_string: String,
+    land1_string: String,
+    file_nbr_string: String,
+    xcopm_string: String,
+    kidno_string: String,
+    zaldt_string: String,
+    empfg_string: String,
+    bnkn3_string: String,
+    zpfor_string: String,
+    btyp3_string: String,
+    zspra_string: String,
+    anred_string: String,
+    zbnkl_string: String,
+    crval_string: String,
+    zbkon_string: String,
+    paygr_string: String,
+    ubknt_string: String,
+    @Decimal(11, 2) rspm2_decimal_11_2: BigDecimal,
+    ztelx_string: String,
+    @Decimal(13, 2) skvfw_decimal_13_2: BigDecimal,
+    uetr_string: String,
+    laufd_string: String,
+    @Decimal(13, 2) rbet3_decimal_13_2: BigDecimal,
+    dtws3_string: String,
+    bkon2_string: String,
+    mandt_string: String,
+    bkref_string: String,
+    mguid_binary: Array[Byte],
+    hkont_string: String,
+    ausfd_string: String,
+    inst_code_string: String,
+    pernr_string: String,
+    rumsk_string: String,
+    name4_string: String,
+    alebn_string: String,
+    rzums_string: String,
+    hktid_string: String,
+    xmlst_string: String,
+    adrnr_string: String,
+    zanre_string: String,
+    xkdfb_string: String,
+    @Decimal(13, 2) wefmx_decimal_13_2: BigDecimal,
+    btznr_binary: Array[Byte],
+    zort1_string: String,
+    zort2_string: String,
+    zswif_string: String,
+    @Decimal(9, 5) kursf_decimal_9_5: BigDecimal,
+    ztelf_string: String,
+    zbnks_string: String,
+    abwae_string: String,
+    absbu_string: String,
+    @Decimal(13, 2) rskon_decimal_13_2: BigDecimal,
+    pyord_string: String,
+    @Decimal(13, 2) rsko3_decimal_13_2: BigDecimal,
+    rzawe_string: String,
+    @Decimal(15, 0) timestamp_avis_decimal_15_0: BigDecimal,
+    augdt_string: String,
+    bkrf1_string: String,
+    grpno_int: BoxedInt,
+    zbnky_string: String,
+    hbkiw_string: String,
+    ubnks_string: String,
+    valut_string: String,
+    iban1_string: String,
+    bvtyp_string: String,
+    @Decimal(13, 2) rsko2_decimal_13_2: BigDecimal,
+    bnkl1_string: String,
+    zpstl_string: String,
+    fm_status_string: String,
+    zbnkn_string: String,
+    @Decimal(9, 5) kurs2_decimal_9_5: BigDecimal,
+    pstlz_string: String,
+    xinve_string: String,
+    xezer_string: String,
+    rfttrn_string: String,
+    name2_string: String,
+    dtws4_string: String,
+    koinh_string: String,
+    @Decimal(11, 2) rspe2_decimal_11_2: BigDecimal,
+    zlspr_string: String,
+    btyp2_string: String,
+    pstl2_string: String,
+    @Decimal(13, 2) rwskt_decimal_13_2: BigDecimal,
+    dorigin_string: String,
+    znme2_string: String,
+    dtaws_string: String,
+    ort01_string: String,
+    zstc1_string: String,
+    lifnr_string: String,
+    @Decimal(5, 0) rtext_decimal_5_0: BigDecimal,
+    ubhkt_string: String,
+    zadnr_string: String,
+    iban2_string: String,
+    hbkid_string: String,
+    znme1_string: String,
+    laufi_string: String,
+    zbukr_string: String,
+    bnkl3_string: String,
+    edibn_string: String,
+    anfae_string: String,
+    seqnr_string: String,
+    @Decimal(11, 2) rspe1_decimal_11_2: BigDecimal,
+    kunnr_string: String,
+    ubnkl_string: String,
+    stras_string: String,
+    @Decimal(5, 0) rpost_decimal_5_0: BigDecimal,
+    ubkon_string: String,
+    @Decimal(9, 5) kurs3_decimal_9_5: BigDecimal,
+    srtf2_string: String,
+    idoc_num_avis_string: String,
+    zland_string: String,
+    ztlfx_string: String,
+    srtgb_string: String,
+    eikto_string: String,
+    dtws2_string: String,
+    bkon3_string: String,
+    zpfac_string: String,
+    waers_string: String,
+    iban3_string: String,
+    @Decimal(13, 2) wehmx_decimal_13_2: BigDecimal,
+    uiban_string: String,
+    bkrf3_string: String,
+    ediav_string: String
+) extends Entity
+
+object reguh extends TableSpec[E_reguh](enableChangeDataFeed = true, manualClusterBy = None, timetravelDays = 35) with Loaded
+
+// AUTO GENERATED:START
+// Generated by ColumnWithNameAccessorEmbeddedAstBuilder - DO NOT EDIT MANUALLY
+
+import ct.dna.lakehouse.core.model.ColumnWithName
+import ct.dna.lakehouse.core.model.ColumnWithNameAccessor
+
+sealed class C_reguh(prefix: String) extends ColumnWithNameAccessor {
+  val _mk_org: ColumnWithName = ColumnWithName(prefix + "_mk_org")
+  val _mk_site: ColumnWithName = ColumnWithName(prefix + "_mk_site")
+  val _mk_system: ColumnWithName = ColumnWithName(prefix + "_mk_system")
+  val _mk_instance: ColumnWithName = ColumnWithName(prefix + "_mk_instance")
+  val _mk_partition: ColumnWithName = ColumnWithName(prefix + "_mk_partition")
+  val _mk_file: ColumnWithName = ColumnWithName(prefix + "_mk_file")
+  val _mk_container: ColumnWithName = ColumnWithName(prefix + "_mk_container")
+  val _mk_account: ColumnWithName = ColumnWithName(prefix + "_mk_account")
+  val _mk_created_at: ColumnWithName = ColumnWithName(prefix + "_mk_created_at")
+  val _lh_id_in_message: ColumnWithName = ColumnWithName(prefix + "_lh_id_in_message")
+  val _lh_ingest_warning: ColumnWithName = ColumnWithName(prefix + "_lh_ingest_warning")
+  val znme3_string: ColumnWithName = ColumnWithName(prefix + "znme3_string")
+  val xvorl_string: ColumnWithName = ColumnWithName(prefix + "xvorl_string")
+  val bnkn2_string: ColumnWithName = ColumnWithName(prefix + "bnkn2_string")
+  val dtams_string: ColumnWithName = ColumnWithName(prefix + "dtams_string")
+  val ubnky_string: ColumnWithName = ColumnWithName(prefix + "ubnky_string")
+  val srtf1_string: ColumnWithName = ColumnWithName(prefix + "srtf1_string")
+  val zpst2_string: ColumnWithName = ColumnWithName(prefix + "zpst2_string")
+  val idoc_num_string: ColumnWithName = ColumnWithName(prefix + "idoc_num_string")
+  val purp_code_string: ColumnWithName = ColumnWithName(prefix + "purp_code_string")
+  val znme4_string: ColumnWithName = ColumnWithName(prefix + "znme4_string")
+  val wefae_string: ColumnWithName = ColumnWithName(prefix + "wefae_string")
+  val seq_type_string: ColumnWithName = ColumnWithName(prefix + "seq_type_string")
+  val weamx_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "weamx_decimal_3_0")
+  val saknr_string: ColumnWithName = ColumnWithName(prefix + "saknr_string")
+  val srtf3_string: ColumnWithName = ColumnWithName(prefix + "srtf3_string")
+  val fpm_key_string: ColumnWithName = ColumnWithName(prefix + "fpm_key_string")
+  val rbetr_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rbetr_decimal_13_2")
+  val xavis_string: ColumnWithName = ColumnWithName(prefix + "xavis_string")
+  val rwbtr_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rwbtr_decimal_13_2")
+  val pfach_string: ColumnWithName = ColumnWithName(prefix + "pfach_string")
+  val avisg_string: ColumnWithName = ColumnWithName(prefix + "avisg_string")
+  val zregi_string: ColumnWithName = ColumnWithName(prefix + "zregi_string")
+  val btyp1_string: ColumnWithName = ColumnWithName(prefix + "btyp1_string")
+  val bnkn1_string: ColumnWithName = ColumnWithName(prefix + "bnkn1_string")
+  val xcorr_string: ColumnWithName = ColumnWithName(prefix + "xcorr_string")
+  val dtws1_string: ColumnWithName = ColumnWithName(prefix + "dtws1_string")
+  val name3_string: ColumnWithName = ColumnWithName(prefix + "name3_string")
+  val zbvty_string: ColumnWithName = ColumnWithName(prefix + "zbvty_string")
+  val wevwv_string: ColumnWithName = ColumnWithName(prefix + "wevwv_string")
+  val srtbp_string: ColumnWithName = ColumnWithName(prefix + "srtbp_string")
+  val text_string: ColumnWithName = ColumnWithName(prefix + "text_string")
+  val bnks1_string: ColumnWithName = ColumnWithName(prefix + "bnks1_string")
+  val bnks2_string: ColumnWithName = ColumnWithName(prefix + "bnks2_string")
+  val bnks3_string: ColumnWithName = ColumnWithName(prefix + "bnks3_string")
+  val rbet2_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rbet2_decimal_13_2")
+  val name1_string: ColumnWithName = ColumnWithName(prefix + "name1_string")
+  val bkon1_string: ColumnWithName = ColumnWithName(prefix + "bkon1_string")
+  val vblnr_string: ColumnWithName = ColumnWithName(prefix + "vblnr_string")
+  val stcd1_string: ColumnWithName = ColumnWithName(prefix + "stcd1_string")
+  val regio_string: ColumnWithName = ColumnWithName(prefix + "regio_string")
+  val wdate_string: ColumnWithName = ColumnWithName(prefix + "wdate_string")
+  val rspm1_decimal_11_2: ColumnWithName = ColumnWithName(prefix + "rspm1_decimal_11_2")
+  val busab_string: ColumnWithName = ColumnWithName(prefix + "busab_string")
+  val wehrs_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "wehrs_decimal_13_2")
+  val bnkl2_string: ColumnWithName = ColumnWithName(prefix + "bnkl2_string")
+  val xaend_string: ColumnWithName = ColumnWithName(prefix + "xaend_string")
+  val bkrf2_string: ColumnWithName = ColumnWithName(prefix + "bkrf2_string")
+  val hktiw_string: ColumnWithName = ColumnWithName(prefix + "hktiw_string")
+  val ziban_string: ColumnWithName = ColumnWithName(prefix + "ziban_string")
+  val zstra_string: ColumnWithName = ColumnWithName(prefix + "zstra_string")
+  val uzawe_string: ColumnWithName = ColumnWithName(prefix + "uzawe_string")
+  val dskvh_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "dskvh_decimal_13_2")
+  val wefrs_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "wefrs_decimal_13_2")
+  val skvhw_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "skvhw_decimal_13_2")
+  val xsiwe_string: ColumnWithName = ColumnWithName(prefix + "xsiwe_string")
+  val land1_string: ColumnWithName = ColumnWithName(prefix + "land1_string")
+  val file_nbr_string: ColumnWithName = ColumnWithName(prefix + "file_nbr_string")
+  val xcopm_string: ColumnWithName = ColumnWithName(prefix + "xcopm_string")
+  val kidno_string: ColumnWithName = ColumnWithName(prefix + "kidno_string")
+  val zaldt_string: ColumnWithName = ColumnWithName(prefix + "zaldt_string")
+  val empfg_string: ColumnWithName = ColumnWithName(prefix + "empfg_string")
+  val bnkn3_string: ColumnWithName = ColumnWithName(prefix + "bnkn3_string")
+  val zpfor_string: ColumnWithName = ColumnWithName(prefix + "zpfor_string")
+  val btyp3_string: ColumnWithName = ColumnWithName(prefix + "btyp3_string")
+  val zspra_string: ColumnWithName = ColumnWithName(prefix + "zspra_string")
+  val anred_string: ColumnWithName = ColumnWithName(prefix + "anred_string")
+  val zbnkl_string: ColumnWithName = ColumnWithName(prefix + "zbnkl_string")
+  val crval_string: ColumnWithName = ColumnWithName(prefix + "crval_string")
+  val zbkon_string: ColumnWithName = ColumnWithName(prefix + "zbkon_string")
+  val paygr_string: ColumnWithName = ColumnWithName(prefix + "paygr_string")
+  val ubknt_string: ColumnWithName = ColumnWithName(prefix + "ubknt_string")
+  val rspm2_decimal_11_2: ColumnWithName = ColumnWithName(prefix + "rspm2_decimal_11_2")
+  val ztelx_string: ColumnWithName = ColumnWithName(prefix + "ztelx_string")
+  val skvfw_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "skvfw_decimal_13_2")
+  val uetr_string: ColumnWithName = ColumnWithName(prefix + "uetr_string")
+  val laufd_string: ColumnWithName = ColumnWithName(prefix + "laufd_string")
+  val rbet3_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rbet3_decimal_13_2")
+  val dtws3_string: ColumnWithName = ColumnWithName(prefix + "dtws3_string")
+  val bkon2_string: ColumnWithName = ColumnWithName(prefix + "bkon2_string")
+  val mandt_string: ColumnWithName = ColumnWithName(prefix + "mandt_string")
+  val bkref_string: ColumnWithName = ColumnWithName(prefix + "bkref_string")
+  val mguid_binary: ColumnWithName = ColumnWithName(prefix + "mguid_binary")
+  val hkont_string: ColumnWithName = ColumnWithName(prefix + "hkont_string")
+  val ausfd_string: ColumnWithName = ColumnWithName(prefix + "ausfd_string")
+  val inst_code_string: ColumnWithName = ColumnWithName(prefix + "inst_code_string")
+  val pernr_string: ColumnWithName = ColumnWithName(prefix + "pernr_string")
+  val rumsk_string: ColumnWithName = ColumnWithName(prefix + "rumsk_string")
+  val name4_string: ColumnWithName = ColumnWithName(prefix + "name4_string")
+  val alebn_string: ColumnWithName = ColumnWithName(prefix + "alebn_string")
+  val rzums_string: ColumnWithName = ColumnWithName(prefix + "rzums_string")
+  val hktid_string: ColumnWithName = ColumnWithName(prefix + "hktid_string")
+  val xmlst_string: ColumnWithName = ColumnWithName(prefix + "xmlst_string")
+  val adrnr_string: ColumnWithName = ColumnWithName(prefix + "adrnr_string")
+  val zanre_string: ColumnWithName = ColumnWithName(prefix + "zanre_string")
+  val xkdfb_string: ColumnWithName = ColumnWithName(prefix + "xkdfb_string")
+  val wefmx_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "wefmx_decimal_13_2")
+  val btznr_binary: ColumnWithName = ColumnWithName(prefix + "btznr_binary")
+  val zort1_string: ColumnWithName = ColumnWithName(prefix + "zort1_string")
+  val zort2_string: ColumnWithName = ColumnWithName(prefix + "zort2_string")
+  val zswif_string: ColumnWithName = ColumnWithName(prefix + "zswif_string")
+  val kursf_decimal_9_5: ColumnWithName = ColumnWithName(prefix + "kursf_decimal_9_5")
+  val ztelf_string: ColumnWithName = ColumnWithName(prefix + "ztelf_string")
+  val zbnks_string: ColumnWithName = ColumnWithName(prefix + "zbnks_string")
+  val abwae_string: ColumnWithName = ColumnWithName(prefix + "abwae_string")
+  val absbu_string: ColumnWithName = ColumnWithName(prefix + "absbu_string")
+  val rskon_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rskon_decimal_13_2")
+  val pyord_string: ColumnWithName = ColumnWithName(prefix + "pyord_string")
+  val rsko3_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rsko3_decimal_13_2")
+  val rzawe_string: ColumnWithName = ColumnWithName(prefix + "rzawe_string")
+  val timestamp_avis_decimal_15_0: ColumnWithName = ColumnWithName(prefix + "timestamp_avis_decimal_15_0")
+  val augdt_string: ColumnWithName = ColumnWithName(prefix + "augdt_string")
+  val bkrf1_string: ColumnWithName = ColumnWithName(prefix + "bkrf1_string")
+  val grpno_int: ColumnWithName = ColumnWithName(prefix + "grpno_int")
+  val zbnky_string: ColumnWithName = ColumnWithName(prefix + "zbnky_string")
+  val hbkiw_string: ColumnWithName = ColumnWithName(prefix + "hbkiw_string")
+  val ubnks_string: ColumnWithName = ColumnWithName(prefix + "ubnks_string")
+  val valut_string: ColumnWithName = ColumnWithName(prefix + "valut_string")
+  val iban1_string: ColumnWithName = ColumnWithName(prefix + "iban1_string")
+  val bvtyp_string: ColumnWithName = ColumnWithName(prefix + "bvtyp_string")
+  val rsko2_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rsko2_decimal_13_2")
+  val bnkl1_string: ColumnWithName = ColumnWithName(prefix + "bnkl1_string")
+  val zpstl_string: ColumnWithName = ColumnWithName(prefix + "zpstl_string")
+  val fm_status_string: ColumnWithName = ColumnWithName(prefix + "fm_status_string")
+  val zbnkn_string: ColumnWithName = ColumnWithName(prefix + "zbnkn_string")
+  val kurs2_decimal_9_5: ColumnWithName = ColumnWithName(prefix + "kurs2_decimal_9_5")
+  val pstlz_string: ColumnWithName = ColumnWithName(prefix + "pstlz_string")
+  val xinve_string: ColumnWithName = ColumnWithName(prefix + "xinve_string")
+  val xezer_string: ColumnWithName = ColumnWithName(prefix + "xezer_string")
+  val rfttrn_string: ColumnWithName = ColumnWithName(prefix + "rfttrn_string")
+  val name2_string: ColumnWithName = ColumnWithName(prefix + "name2_string")
+  val dtws4_string: ColumnWithName = ColumnWithName(prefix + "dtws4_string")
+  val koinh_string: ColumnWithName = ColumnWithName(prefix + "koinh_string")
+  val rspe2_decimal_11_2: ColumnWithName = ColumnWithName(prefix + "rspe2_decimal_11_2")
+  val zlspr_string: ColumnWithName = ColumnWithName(prefix + "zlspr_string")
+  val btyp2_string: ColumnWithName = ColumnWithName(prefix + "btyp2_string")
+  val pstl2_string: ColumnWithName = ColumnWithName(prefix + "pstl2_string")
+  val rwskt_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "rwskt_decimal_13_2")
+  val dorigin_string: ColumnWithName = ColumnWithName(prefix + "dorigin_string")
+  val znme2_string: ColumnWithName = ColumnWithName(prefix + "znme2_string")
+  val dtaws_string: ColumnWithName = ColumnWithName(prefix + "dtaws_string")
+  val ort01_string: ColumnWithName = ColumnWithName(prefix + "ort01_string")
+  val zstc1_string: ColumnWithName = ColumnWithName(prefix + "zstc1_string")
+  val lifnr_string: ColumnWithName = ColumnWithName(prefix + "lifnr_string")
+  val rtext_decimal_5_0: ColumnWithName = ColumnWithName(prefix + "rtext_decimal_5_0")
+  val ubhkt_string: ColumnWithName = ColumnWithName(prefix + "ubhkt_string")
+  val zadnr_string: ColumnWithName = ColumnWithName(prefix + "zadnr_string")
+  val iban2_string: ColumnWithName = ColumnWithName(prefix + "iban2_string")
+  val hbkid_string: ColumnWithName = ColumnWithName(prefix + "hbkid_string")
+  val znme1_string: ColumnWithName = ColumnWithName(prefix + "znme1_string")
+  val laufi_string: ColumnWithName = ColumnWithName(prefix + "laufi_string")
+  val zbukr_string: ColumnWithName = ColumnWithName(prefix + "zbukr_string")
+  val bnkl3_string: ColumnWithName = ColumnWithName(prefix + "bnkl3_string")
+  val edibn_string: ColumnWithName = ColumnWithName(prefix + "edibn_string")
+  val anfae_string: ColumnWithName = ColumnWithName(prefix + "anfae_string")
+  val seqnr_string: ColumnWithName = ColumnWithName(prefix + "seqnr_string")
+  val rspe1_decimal_11_2: ColumnWithName = ColumnWithName(prefix + "rspe1_decimal_11_2")
+  val kunnr_string: ColumnWithName = ColumnWithName(prefix + "kunnr_string")
+  val ubnkl_string: ColumnWithName = ColumnWithName(prefix + "ubnkl_string")
+  val stras_string: ColumnWithName = ColumnWithName(prefix + "stras_string")
+  val rpost_decimal_5_0: ColumnWithName = ColumnWithName(prefix + "rpost_decimal_5_0")
+  val ubkon_string: ColumnWithName = ColumnWithName(prefix + "ubkon_string")
+  val kurs3_decimal_9_5: ColumnWithName = ColumnWithName(prefix + "kurs3_decimal_9_5")
+  val srtf2_string: ColumnWithName = ColumnWithName(prefix + "srtf2_string")
+  val idoc_num_avis_string: ColumnWithName = ColumnWithName(prefix + "idoc_num_avis_string")
+  val zland_string: ColumnWithName = ColumnWithName(prefix + "zland_string")
+  val ztlfx_string: ColumnWithName = ColumnWithName(prefix + "ztlfx_string")
+  val srtgb_string: ColumnWithName = ColumnWithName(prefix + "srtgb_string")
+  val eikto_string: ColumnWithName = ColumnWithName(prefix + "eikto_string")
+  val dtws2_string: ColumnWithName = ColumnWithName(prefix + "dtws2_string")
+  val bkon3_string: ColumnWithName = ColumnWithName(prefix + "bkon3_string")
+  val zpfac_string: ColumnWithName = ColumnWithName(prefix + "zpfac_string")
+  val waers_string: ColumnWithName = ColumnWithName(prefix + "waers_string")
+  val iban3_string: ColumnWithName = ColumnWithName(prefix + "iban3_string")
+  val wehmx_decimal_13_2: ColumnWithName = ColumnWithName(prefix + "wehmx_decimal_13_2")
+  val uiban_string: ColumnWithName = ColumnWithName(prefix + "uiban_string")
+  val bkrf3_string: ColumnWithName = ColumnWithName(prefix + "bkrf3_string")
+  val ediav_string: ColumnWithName = ColumnWithName(prefix + "ediav_string")
+}
+
+object C_reguh extends C_reguh("") {
+  def as(alias: String): C_reguh = new C_reguh(alias + ".")
+}
+
+// AUTO GENERATED:END

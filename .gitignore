@@ -1,20 +1,20 @@
-#Version 1
 # ignore macOS local files
 .DS_Store
 # ignore vscode and metals local files
-.bloop**
+.bloop/**
+.bsp**
 .metals**
 .vscode**
+project/.bloop**
 project/project**
 project/target**
 project/metals.sbt
 target/*
-*/target/*
+build-plugin/target/*
+cicd/target/*
+lakehouse/target/*
 sbt-launch.jar
-# ignore sbt local files
-.bsp**
 
-*/src/main/resources/log4j2.properties
 # ignore local test-config resources
 */src/test/resources/test-config.json
 */src/test/resources/test-config.json.*
