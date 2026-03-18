@@ -1,0 +1,62 @@
+resources:
+  jobs:
+    lakeflow_job:
+      name: lakeflow_job
+      # Job cluster definition. Node type is governed by the instance pool when
+      # instance_pool_id is set; the pool is shared with LakehouseJob at runtime.
+      # Cluster settings (spark version, policy) are consistent via bundle variables.
+      job_clusters:
+        - job_cluster_key: lakeflow-cluster
+          new_cluster:
+            spark_version: ${var.spark_version}
+            instance_pool_id: ${var.instance_pool_id}
+            autoscale:
+              min_workers: 1
+              max_workers: 2
+      tasks:
+        - task_key: dwh_orders
+          spark_jar_task:
+            main_class_name: ct.dna.lakehouse.core.jobs.TableUpdaterJob
+            parameters:
+              - ct.dna.lakehouse.core.testcatalog.dwh_schema
+              - dwh_orders
+          job_cluster_key: lakeflow-cluster
+          libraries:
+            - jar: ${var.jar_latest_path}
+        - task_key: dm_country
+          spark_jar_task:
+            main_class_name: ct.dna.lakehouse.core.jobs.TableUpdaterJob
+            parameters:
+              - ct.dna.lakehouse.core.testcatalog.dwh_schema
+              - dm_country
+          job_cluster_key: lakeflow-cluster
+          libraries:
+            - jar: ${var.jar_latest_path}
+          depends_on:
+            - task_key: dwh_orders
+        - task_key: dm_customer
+          spark_jar_task:
+            main_class_name: ct.dna.lakehouse.core.jobs.TableUpdaterJob
+            parameters:
+              - ct.dna.lakehouse.core.testcatalog.dwh_schema
+              - dm_customer
+          job_cluster_key: lakeflow-cluster
+          libraries:
+            - jar: ${var.jar_latest_path}
+          depends_on:
+            - task_key: dwh_orders
+        - task_key: dm_daily
+          spark_jar_task:
+            main_class_name: ct.dna.lakehouse.core.jobs.TableUpdaterJob
+            parameters:
+              - ct.dna.lakehouse.core.testcatalog.dwh_schema
+              - dm_daily
+          job_cluster_key: lakeflow-cluster
+          libraries:
+            - jar: ${var.jar_latest_path}
+          depends_on:
+            - task_key: dwh_orders
+      max_concurrent_runs: 1
+      timeout_seconds: 0
+      queue:
+        enabled: true
