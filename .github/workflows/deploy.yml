@@ -46,8 +46,8 @@ jobs:
       - name: Prepare sbt credentials
         uses: ./.github/actions/sbt-credentials
         with:
-          host: ${{ vars.ARTIFACTORY_HOST }}
-          username: ${{ vars.ARTIFACTORY_USERNAME }}
+          host: ${{ secrets.ARTIFACTORY_HOST }}
+          username: ${{ secrets.ARTIFACTORY_USERNAME }}
           token: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
       - name: Determine stage
