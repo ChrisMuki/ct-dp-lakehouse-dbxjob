@@ -1,0 +1,67 @@
+{
+  "_comment": "Template for deployment config. Copy to dev.json / prod.json and fill in the values. Fields marked OPTIONAL can be omitted — defaults are shown.",
+  "deploymentConfig": {
+
+    "_comment_1_required": "=== REQUIRED ===",
+
+    "host": "https://adb-XXXXXXXXXXXXXXXX.XX.azuredatabricks.net",
+
+    "_comment_deploymentIdentity": "Choose ONE auth option below. Rename it to 'deploymentIdentity' and remove the other two.",
+    "deploymentIdentity_option1_azure_sp": {
+      "_comment": "Azure-registered service principal — recommended for CI/CD (GitHub Actions)",
+      "authType": "azure-client-secret",
+      "tenantId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "clientId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "clientSecret": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    },
+    "deploymentIdentity_option2_oauth_m2m": {
+      "_comment": "Databricks-native service principal via OAuth M2M",
+      "authType": "oauth-m2m",
+      "clientId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "clientSecret": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    },
+    "deploymentIdentity_option3_pat": {
+      "_comment": "Personal access token — simplest for ad-hoc local testing. Client ID = Used for Schema of the volume path in Databricks (e.g. ctdpdevdbxsandbox.clientid). Omit or set to 'default' to use 'default' schema.",
+      "authType": "pat",
+      "clientId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "token": "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    },
+
+    "_comment_2_optional": "=== OPTIONAL (all have defaults) ===",
+
+    "_comment_volumeCatalog": "Unity Catalog catalog for job resource volumes. Default: ctdp<stage>dbxlakehouse (e.g. ctdpdevdbxlakehouse, ctdpproddbxlakehouse).",
+    "volumeCatalog": "ctdpXXXXXXdbxlakehouse",
+
+    "_comment_targetMode": "'production' (default) or 'development'. Development mode omits run_as so the job runs as the deploying identity (PAT owner or OAuth-M2M SP).",
+    "targetMode": "production",
+
+    "_comment_clusterConfiguration": "All sub-fields are optional with defaults. The entire block can be omitted.",
+    "clusterConfiguration": {
+      "_comment_sparkVersion": "Databricks Runtime version. Default: 17.3.x-scala2.13",
+      "sparkVersion": "17.3.x-scala2.13",
+      "_comment_clusterPolicyId": "Cluster policy ID. Omit to create clusters without a policy.",
+      "clusterPolicyId": "XXXXXXXXXXXXXXXX",
+      "_comment_maxWorkerNodes": "Maximum autoscale worker count. Default: 4",
+      "maxWorkerNodes": 4,
+      "_comment_nodeTypes": "Worker and driver VM sizes. Default: Standard_D8ds_v5. Ignored when instancePoolId is set.",
+      "nodeTypeId": "Standard_D8ds_v5",
+      "driverNodeTypeId": "Standard_D8ds_v5",
+      "_comment_instancePoolId": "Azure instance pool ID. When set, cluster node types are governed by the pool. Exposed as bundle variable 'instance_pool_id' for included resource files.",
+      "instancePoolId": "XXXXXXXXXXXXXXXX"
+    },
+
+    "_comment_resourceFilesPath": "Path relative to project root to a resource YAML file or directory (*.yml / *.yaml). Files are included in the bundle via 'include:'. Omit to deploy without extra resource files.",
+    "resourceFilesPath": "resources",
+
+    "_comment_schedule": "Cron schedule for the job. Omit to leave the job unscheduled (trigger manually or via API).",
+    "schedule": {
+      "_comment_quartzCronExpression": "Quartz cron expression. Example: '0 0 * ? * *' = every hour on the hour.",
+      "quartzCronExpression": "0 0 * ? * *",
+      "_comment_timezoneId": "IANA timezone identifier. Default: UTC",
+      "timezoneId": "UTC",
+      "_comment_pauseStatus": "UNPAUSED = active schedule. PAUSED = defined but disabled.",
+      "pauseStatus": "UNPAUSED"
+    }
+
+  }
+}
