@@ -6,7 +6,7 @@ case class DeploymentConfig(
       */
     volumeCatalog: Option[String] = None,
     deploymentIdentity: DeploymentConfig.DeploymentIdentity,
-    jobRunIdentity: Option[DeploymentConfig.JobRunIdentity] = None,
+
     /** Cluster settings. Entire block is optional — all fields have sensible defaults. Only override what differs from the defaults for your environment.
       */
     clusterConfiguration: DeploymentConfig.ClusterConfiguration = DeploymentConfig.ClusterConfiguration(),
@@ -19,7 +19,7 @@ case class DeploymentConfig(
       */
     schedule: Option[DeploymentConfig.ScheduleConfig] = None,
     /** "production" (default) or "development". In development mode the Databricks CLI ignores run_as and prefixes the job name with [dev <username>], so the
-      * job runs as the deploying identity (PAT owner or OAuth-M2M SP), not the jobRunIdentity.
+      * job runs as the deploying identity (PAT owner or OAuth-M2M SP).
       */
     targetMode: String = "production"
 )
@@ -40,15 +40,6 @@ object DeploymentConfig {
       clientId: Option[String] = None, // azure-client-secret + oauth-m2m
       clientSecret: Option[String] = None, // azure-client-secret + oauth-m2m
       token: Option[String] = None // pat only
-  )
-
-  case class JobRunIdentity(
-      /** Short identifier used as:
-        *   1. The Unity Catalog schema name in the volume path (no special chars). 2. The `service_principal_name` in `run_as` for production bundles. Use a
-        *      service-principal UUID for production, or a short personal shortname (e.g. "uih00000") for development — run_as is omitted in development mode so
-        *      the value is only used for the volume schema path. When absent, the volume schema defaults to "default" and run_as is omitted.
-        */
-      clientId: String
   )
 
   case class ClusterConfiguration(

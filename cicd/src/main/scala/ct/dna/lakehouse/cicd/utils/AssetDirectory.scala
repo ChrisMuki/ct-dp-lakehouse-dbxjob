@@ -28,9 +28,10 @@ case class AssetDirectory(
     */
   val volumeCatalog: String = deploymentConfig.volumeCatalog.getOrElse(s"ctdp${stage}dbxlakehouse")
 
-  /** Schema name in the Unity Catalog volume path. Defaults to "default" when jobRunIdentity is absent.
+  /** Schema name in the Unity Catalog volume path. Uses the deploying identity's clientId (SP UUID for azure-client-secret/oauth-m2m). Defaults to "default"
+    * when clientId is absent (e.g. PAT auth).
     */
-  val volumeSchema: String = deploymentConfig.jobRunIdentity.map(_.clientId).getOrElse("default")
+  val volumeSchema: String = deploymentConfig.deploymentIdentity.clientId.getOrElse("default")
   val volumeName: String = "dbxlakehousejob"
 
   /** Volume path where all job resources (JAR, config files) will be stored. */
@@ -167,15 +168,6 @@ case class AssetDirectory(
       .cloneRaw()
       .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
     val tree = yamlMapper.valueToTree[ObjectNode](assetBundle)
-
-    // run_as is omitted when:
-    // - targetMode is not production (dev mode: job runs as deploying identity), OR
-    // - jobRunIdentity is absent (no SP configured)
-    if (deploymentConfig.targetMode != "production" || deploymentConfig.jobRunIdentity.isEmpty) {
-      Option(tree.path("resources").path("jobs").path("LakehouseJob"))
-        .collect { case obj: ObjectNode => obj }
-        .foreach(_.remove("run_as"))
-    }
 
     // Remove policy_id from the cluster node when no policy is configured
     // (the library requires a String, so we passed "" as placeholder).

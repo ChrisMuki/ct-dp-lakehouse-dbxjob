@@ -21,28 +21,18 @@
       "clientSecret": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     },
     "deploymentIdentity_option3_pat": {
-      "_comment": "Personal access token — simplest for ad-hoc local testing",
+      "_comment": "Personal access token — simplest for ad-hoc local testing. Client ID = Used for Schema of the volume path in Databricks (e.g. ctdpdevdbxsandbox.clientid). Omit or set to 'default' to use 'default' schema.",
       "authType": "pat",
-      "token": "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    },
-    "deploymentIdentity": {
-      "authType": "azure-client-secret",
-      "tenantId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
       "clientId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
-      "clientSecret": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      "token": "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     },
 
     "_comment_2_optional": "=== OPTIONAL (all have defaults) ===",
 
-    "_comment_jobRunIdentity": "SP or user identity for the Databricks job. clientId is used as (1) Unity Catalog schema name in the volume path and (2) run_as in production mode. When absent: volume schema = 'default', run_as is omitted.",
-    "jobRunIdentity": {
-      "clientId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
-    },
-
     "_comment_volumeCatalog": "Unity Catalog catalog for job resource volumes. Default: ctdp<stage>dbxlakehouse (e.g. ctdpdevdbxlakehouse, ctdpproddbxlakehouse).",
     "volumeCatalog": "ctdpXXXXXXdbxlakehouse",
 
-    "_comment_targetMode": "'production' (default) emits run_as using jobRunIdentity. 'development' omits run_as so the job runs as the deploying user.",
+    "_comment_targetMode": "'production' (default) or 'development'. Development mode omits run_as so the job runs as the deploying identity (PAT owner or OAuth-M2M SP).",
     "targetMode": "production",
 
     "_comment_clusterConfiguration": "All sub-fields are optional with defaults. The entire block can be omitted.",
