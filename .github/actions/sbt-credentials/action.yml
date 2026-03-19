@@ -16,8 +16,15 @@ runs:
     - name: SBT credentials setup
       shell: bash
       run: |
-        mkdir -p /root/.sbt
-        echo 'realm=Artifactory Realm' > /root/.sbt/.credentials
-        echo "host=${{ inputs.host }}" >> /root/.sbt/.credentials
-        echo "user=${{ inputs.username }}" >> /root/.sbt/.credentials
-        echo "password=${{ inputs.token }}" >> /root/.sbt/.credentials
+        mkdir -p "${HOME}/.sbt"
+
+        echo 'realm=Artifactory Realm' > "${HOME}/.sbt/.credentials
+        echo "host=${{ inputs.host }}" >> "${HOME}/.sbt/.credentials
+        echo "user=${{ inputs.username }}" >> "${HOME}/.sbt/.credentials
+        echo "password=${{ inputs.token }}" >> "${HOME}/.sbt/.credentials
+        # Also write to /root/.sbt in case HOME differs inside the container.
+        if [ "${HOME}" != "/root" ]; then
+          mkdir -p /root/.sbt
+          cp "${HOME}/.sbt/.credentials" /root/.sbt/.credentials
+        fi
+
