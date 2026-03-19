@@ -22,19 +22,19 @@ object Deploy extends LoggingTrait {
       .required("deploymentConfig")
       .build(args)
 
-    val stage     = config.getProperty("stage")
-    val rootPath  = config.getProperty("rootPath")
+    val stage = config.getProperty("stage")
+    val rootPath = config.getProperty("rootPath")
     val assetPath = config.getProperty("assetPath")
-    val jarPath   = config.getProperty("jarPath")
-    val buildId   = config.getProperty("buildId")
+    val jarPath = config.getProperty("jarPath")
+    val buildId = config.getProperty("buildId")
 
     val deploymentConfig =
       json.mapper.readValue[DeploymentConfig](config.getProperty("deploymentConfig"))
 
     logger.info(s"Starting deployment: stage=$stage buildId=$buildId")
 
-    val assetDir   = AssetDirectory(stage, assetPath, buildId, deploymentConfig)
-    val rootDir    = LocalDir(rootPath)
+    val assetDir = AssetDirectory(stage, assetPath, buildId, deploymentConfig)
+    val rootDir = LocalDir(rootPath)
     val gitProcess = Process(rootDir, Seq())
 
     val jobResourcesPathAsBDFS = "dbfs:" + assetDir.jobResourcesPath
@@ -42,22 +42,22 @@ object Deploy extends LoggingTrait {
     val dbxEnv: Seq[(String, String)] = deploymentConfig.deploymentIdentity.authType match {
       case "azure-client-secret" =>
         Seq(
-          "DATABRICKS_HOST"      -> deploymentConfig.host,
+          "DATABRICKS_HOST" -> deploymentConfig.host,
           "DATABRICKS_AUTH_TYPE" -> "azure-client-secret",
-          "ARM_TENANT_ID"        -> deploymentConfig.deploymentIdentity.tenantId.getOrElse(sys.error("tenantId required for azure-client-secret auth")),
-          "ARM_CLIENT_ID"        -> deploymentConfig.deploymentIdentity.clientId.getOrElse(sys.error("clientId required for azure-client-secret auth")),
-          "ARM_CLIENT_SECRET"    -> deploymentConfig.deploymentIdentity.clientSecret.getOrElse(sys.error("clientSecret required for azure-client-secret auth"))
+          "ARM_TENANT_ID" -> deploymentConfig.deploymentIdentity.tenantId.getOrElse(sys.error("tenantId required for azure-client-secret auth")),
+          "ARM_CLIENT_ID" -> deploymentConfig.deploymentIdentity.clientId.getOrElse(sys.error("clientId required for azure-client-secret auth")),
+          "ARM_CLIENT_SECRET" -> deploymentConfig.deploymentIdentity.clientSecret.getOrElse(sys.error("clientSecret required for azure-client-secret auth"))
         )
       case "oauth-m2m" =>
         Seq(
-          "DATABRICKS_HOST"          -> deploymentConfig.host,
-          "DATABRICKS_AUTH_TYPE"     -> "oauth-m2m",
-          "DATABRICKS_CLIENT_ID"     -> deploymentConfig.deploymentIdentity.clientId.getOrElse(sys.error("clientId required for oauth-m2m auth")),
+          "DATABRICKS_HOST" -> deploymentConfig.host,
+          "DATABRICKS_AUTH_TYPE" -> "oauth-m2m",
+          "DATABRICKS_CLIENT_ID" -> deploymentConfig.deploymentIdentity.clientId.getOrElse(sys.error("clientId required for oauth-m2m auth")),
           "DATABRICKS_CLIENT_SECRET" -> deploymentConfig.deploymentIdentity.clientSecret.getOrElse(sys.error("clientSecret required for oauth-m2m auth"))
         )
       case "pat" =>
         Seq(
-          "DATABRICKS_HOST"  -> deploymentConfig.host,
+          "DATABRICKS_HOST" -> deploymentConfig.host,
           "DATABRICKS_TOKEN" -> deploymentConfig.deploymentIdentity.token.getOrElse(sys.error("token required for pat auth"))
         )
       case other =>
@@ -88,8 +88,8 @@ object Deploy extends LoggingTrait {
     if (dbxProcess.run("databricks bundle validate") != 0)
       logAndThrow(new RuntimeException("Databricks bundle validation failed."))
 
-    //logger.info("Checking git status")
-    //if (gitProcess.resultOf("git status --porcelain").nonEmpty)
+    // logger.info("Checking git status")
+    // if (gitProcess.resultOf("git status --porcelain").nonEmpty)
     //  logAndThrow(new RuntimeException("There are uncommitted changes — commit or stash before deploying."))
 
     logger.info(s"Creating job resource path: $jobResourcesPathAsBDFS")
@@ -105,7 +105,7 @@ object Deploy extends LoggingTrait {
     logger.info("Copying files to Databricks volume")
     val filesToCopy = Seq(
       assetDir.assetDir.getAbsolutePath + "/log4j2.xml" -> s"$jobResourcesPathAsBDFS/log4j2.xml",
-      jarPath                                            -> s"$jobResourcesPathAsBDFS/lakehouse.jar"
+      jarPath -> s"$jobResourcesPathAsBDFS/lakehouse.jar"
     )
     filesToCopy.foreach { case (from, to) =>
       logger.info(s"Uploading $from -> $to")
@@ -125,8 +125,8 @@ object Deploy extends LoggingTrait {
     if (dbxProcess.run("databricks bundle deploy") != 0)
       logAndThrow(new RuntimeException("Databricks bundle deployment failed."))
 
-    //logger.info("Triggering Databricks job (no-wait)")
-    //if (dbxProcess.run("databricks bundle run LakehouseJob --no-wait") != 0)
+    // logger.info("Triggering Databricks job (no-wait)")
+    // if (dbxProcess.run("databricks bundle run LakehouseJob --no-wait") != 0)
     //  logger.warn("Databricks bundle run failed — trigger the job manually if needed")
 
     logger.info("Cleaning up local staging directory")
@@ -139,5 +139,3 @@ object Deploy extends LoggingTrait {
     logger.info(s"Deployment complete: stage=$stage buildId=$buildId")
   }
 }
-
-
