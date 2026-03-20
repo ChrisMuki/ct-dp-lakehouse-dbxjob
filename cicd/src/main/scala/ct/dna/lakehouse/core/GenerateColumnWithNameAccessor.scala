@@ -83,7 +83,7 @@ object ColumnWithNameAccessor extends LoggingTrait {
     val errors = results.collect { case (trip, Failure(exception)) => trip -> exception }
 
     errors.foreach { case (trip, exception) =>
-      logger.error(s"Failed to process $trip: ${exception.getMessage}", exception)
+      logger.error(s"Failed to process $trip: ${exception.getMessage}")
     }
 
     if (errors.nonEmpty) {
