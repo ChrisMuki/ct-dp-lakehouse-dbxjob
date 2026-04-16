@@ -1,6 +1,6 @@
 import sbt._
 import Keys._
-
+import BomModuleId._
 inThisBuild(
   Seq(
     // Scope: applies to forked run/test JVMs, not the sbt launcher process.
@@ -21,14 +21,14 @@ inThisBuild(
     )
   )
 )
-
+val dnaBomVersion = "1.3.1"
 lazy val lakehouse = project
   .in(file("lakehouse"))
   .enablePlugins(DbxAssemblyPlugin)
   .settings(
     name := "lakehouse",
     assembly / assemblyJarName := "lakehouse.jar",
-    useDnaBom("1.1.2")(
+    useDnaBom(dnaBomVersion)(
       // DBR Runtime
       "dbx-runtime" % Provided,
       // Application Libs
@@ -51,7 +51,7 @@ lazy val cicd = project
     name := "cicd",
     run / fork := true,
     assembly / skip := true,
-    useDnaBom("1.1.2")(
+    useDnaBom(dnaBomVersion)(
       "deploy-utils",
       "lakehouse-modelbuilder",
       "local-spark-runtime"
