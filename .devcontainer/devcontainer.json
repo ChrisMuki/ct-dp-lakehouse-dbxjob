@@ -6,7 +6,6 @@
   "mounts": [
     "type=bind,source=${env:HOME},target=/home/vscode/host.home"
   ],
-  "postCreateCommand": "/bin/bash .devcontainer/postCreateCommand.sh",
   "customizations": {
     "vscode": {
       "settings": {
