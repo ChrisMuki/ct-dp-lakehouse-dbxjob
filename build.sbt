@@ -1,6 +1,6 @@
 import sbt._
 import Keys._
-import BomModuleId._
+
 inThisBuild(
   Seq(
     // Scope: applies to forked run/test JVMs, not the sbt launcher process.
@@ -21,7 +21,11 @@ inThisBuild(
     )
   )
 )
-val dnaBomVersion = "1.3.1"
+
+val dnaBomVersion = "1.3.4"
+
+// lazy val srGenerator: this will contain the code to generate sr_raw and sr tablespec together with their ColumnWithNameAccessors
+
 lazy val lakehouse = project
   .in(file("lakehouse"))
   .enablePlugins(DbxAssemblyPlugin)
@@ -43,6 +47,7 @@ lazy val lakehouse = project
     )
   )
 
+// will be reanmeded to devops later: this will contain the code to all ColumnWithNameAccessors and also ghe related scala files (deployment, ...)
 lazy val cicd = project
   .in(file("cicd"))
   .dependsOn(lakehouse)
@@ -63,7 +68,11 @@ lazy val cicd = project
 
 lazy val root = project
   .in(file("."))
-  .aggregate(lakehouse, cicd)
+  .aggregate(
+    // srGenerator,
+    lakehouse,
+    cicd
+  )
   .settings(
     assembly / skip := true,
     name := "multi-project-root"
