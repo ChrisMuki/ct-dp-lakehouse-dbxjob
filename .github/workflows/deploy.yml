@@ -28,12 +28,14 @@ jobs:
   deploy:
     name: Deploy lakehouse by ${{ github.actor }}
     runs-on: dna-db
-    environment: "DB-DNA-DEV"
-    #environment: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'prod' && 'DB-DNA-PROD' || github.event.inputs.environment == 'qual' && 'DB-DNA-QUAL' || 'DB-DNA-DEV') || github.ref == 'refs/heads/main' && 'DB-DNA-PROD' || github.ref == 'refs/heads/qual' && 'DB-DNA-QUAL' || 'DB-DNA-DEV' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.environment || github.ref == 'refs/heads/main' &&
+      'prod' || github.ref == 'refs/heads/qual' && 'qual' || 'dev' }}
     container:
-      image: ctdsfacr.azurecr.io/runner/sbt_java17:latest
+      image: dsfacr.azurecr.io/runner/dna_temurin_17:latest
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,14 +65,14 @@ jobs:
             STAGE="dev"
           fi
           echo "STAGE=${STAGE}" >> $GITHUB_OUTPUT
-
-          if [ "${STAGE}" = "dev" ]; then
-            echo "TARGET_MODE=development" >> $GITHUB_OUTPUT
-          else
-            echo "TARGET_MODE=production" >> $GITHUB_OUTPUT
-          fi
-
           echo "BUILD_ID=$(date +'%Y%m%d-%H%M')-$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
 
       - name: Build and test lakehouse assembly
         run: sbt "clean;test;lakehouse/assembly"
@@ -84,42 +86,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Deploy to ${{ steps.stage.outputs.STAGE }}
-        env:
-          # Azure Authentication Variables
-          DB_HOST: ${{ secrets.DB_HOST }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          DB_CLIENT_ID: ${{ secrets.DB_CLIENT_ID }}
-          DB_CLIENT_SECRET: ${{ secrets.DB_CLIENT_SECRET }}
-
-          # DAB Variables for Lakehouse Jobs
-          # CLUSTER_POLICY_ID → default: no policy
-          CLUSTER_POLICY_ID: ${{ vars.CLUSTER_POLICY_ID }}
-          # INSTANCE_POOL_ID → default: no pool (uses node types)
-          INSTANCE_POOL_ID: ${{ vars.INSTANCE_POOL_ID }}
-
+        # env:
+        #  DATABRICKS_TF_PROVIDER: opentofu
         run: |
           STAGE="${{ steps.stage.outputs.STAGE }}"
-          TARGET_MODE="${{ steps.stage.outputs.TARGET_MODE }}"
           BUILD_ID="${{ steps.stage.outputs.BUILD_ID }}"
-          # Required fields
-          CONFIG_JSON="{\"host\":\"${DB_HOST}\",\"targetMode\":\"${TARGET_MODE}\","
-          CONFIG_JSON="${CONFIG_JSON}\"deploymentIdentity\":{\"authType\":\"azure-client-secret\","
-          CONFIG_JSON="${CONFIG_JSON}\"tenantId\":\"${ARM_TENANT_ID}\","
-          CONFIG_JSON="${CONFIG_JSON}\"clientId\":\"${DB_CLIENT_ID}\","
-          CONFIG_JSON="${CONFIG_JSON}\"clientSecret\":\"${DB_CLIENT_SECRET}\"}"
 
-          # Optional fields — omitted when var/secret is not set
-          
-          # clusterConfiguration: only include the block if any org-specific
-          # field is set; cluster fields with Scala defaults are not repeated here
-          CLUSTER=""
-          [ -n "${CLUSTER_POLICY_ID}" ] && CLUSTER="${CLUSTER},\"clusterPolicyId\":\"${CLUSTER_POLICY_ID}\""
-          [ -n "${INSTANCE_POOL_ID}" ]  && CLUSTER="${CLUSTER},\"instancePoolId\":\"${INSTANCE_POOL_ID}\""
-          [ -n "${CLUSTER}" ] \
-            && CONFIG_JSON="${CONFIG_JSON},\"clusterConfiguration\":{${CLUSTER#,}}"
-          
-            # resourceFilesPath is fixed for this project
-          CONFIG_JSON="${CONFIG_JSON},\"resourceFilesPath\":\"resources\"}"
+          # Write deployment config from environment variable to a temp file
+          CONFIG_FILE="/tmp/deploy-config.json"
+          echo '${{ vars.DEPLOYMENT_CONFIG }}' > "${CONFIG_FILE}"
 
           ./cicd/target/universal/stage/bin/deploy \
             "stage=${STAGE}" \
@@ -127,4 +102,4 @@ jobs:
             "rootPath=${GITHUB_WORKSPACE}" \
             "assetPath=/tmp/cicd" \
             "jarPath=${GITHUB_WORKSPACE}/lakehouse/target/scala-2.13/lakehouse.jar" \
-            "deploymentConfig=${CONFIG_JSON}"
+            "configFile=${CONFIG_FILE}"

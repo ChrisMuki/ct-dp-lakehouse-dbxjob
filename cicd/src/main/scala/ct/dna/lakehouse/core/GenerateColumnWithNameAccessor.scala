@@ -23,12 +23,12 @@ import ct.dna.utils.runtime.Configuration
   * of the file. Any inconsistent marker state fails for the affected file, while processing continues for the remaining files. All errors are collected and
   * reported at the end.
   */
-object ColumnWithNameAccessor extends LoggingTrait {
+object GenerateColumnWithNameAccessor extends LoggingTrait {
 
   def main(args: Array[String]): Unit = {
 
-    Thread.currentThread().setName("ColumnWithNameAccessor")
-    logger.info("Starting ColumnWithNameAccessor")
+    Thread.currentThread().setName("GenerateColumnWithNameAccessor")
+    logger.info("Starting GenerateColumnWithNameAccessor")
 
     val config = Configuration
       .optional(Configuration.CONFIGFILE, "generate_columns.json")
@@ -46,8 +46,8 @@ object ColumnWithNameAccessor extends LoggingTrait {
     logger.info(s"Found ${allTableSpecs.size} TableSpec object(s)")
 
     val markerConfig = GeneratedBlockPatcher.MarkerConfig(
-      startMarker = ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker,
-      endMarker = ColumnWithNameAccessorEmbeddedAstBuilder.EndMarker
+      startMarker = "// AUTO GENERATED:START",
+      endMarker = "// AUTO GENERATED:END"
     )
 
     var changedCount = 0

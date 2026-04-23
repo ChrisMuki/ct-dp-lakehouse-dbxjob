@@ -22,7 +22,7 @@ inThisBuild(
   )
 )
 
-val dnaBomVersion = "1.3.4"
+val dnaBomVersion = "1.5.0"
 
 // lazy val srGenerator: this will contain the code to generate sr_raw and sr tablespec together with their ColumnWithNameAccessors
 
