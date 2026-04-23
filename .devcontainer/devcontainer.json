@@ -1,7 +1,6 @@
 {
   "name": "DnA_17",
   "image": "dsfacr.azurecr.io/devcontainer/dna_temurin_17:latest",
-  "image": "dsfacr.azurecr.io/devcontainer/dna_temurin_17:latest",
   "containerUser": "vscode",
   "updateRemoteUserUID": true,
   "mounts": [
