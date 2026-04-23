@@ -1,6 +1,5 @@
 import sbt._
 import Keys._
-import Tests._
 
 inThisBuild(
   Seq(
@@ -17,12 +16,15 @@ inThisBuild(
       "--add-opens=java.base/java.net=ALL-UNNAMED",
       "--add-opens=java.base/java.lang=ALL-UNNAMED",
       "--add-opens=java.base/java.util=ALL-UNNAMED",
-      "--add-opens=java.base/java.util=ALL-UNNAMED",
       "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
       "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
     )
   )
 )
+
+val dnaBomVersion = "1.5.0"
+
+// lazy val srGenerator: this will contain the code to generate sr_raw and sr tablespec together with their ColumnWithNameAccessors
 
 lazy val lakehouse = project
   .in(file("lakehouse"))
@@ -30,19 +32,22 @@ lazy val lakehouse = project
   .settings(
     name := "lakehouse",
     assembly / assemblyJarName := "lakehouse.jar",
-    libraryDependencies ++= Seq(
+    useDnaBom(dnaBomVersion)(
       // DBR Runtime
-      "ct.dna" %% "dbx-runtime" % "17.3.0" % Provided,
+      "dbx-runtime" % Provided,
       // Application Libs
-      "ct.dna" %% "common-utils" % "1.16.1",
-      "ct.dna" %% "dataplatform-core" % "1.15.2",
-      "ct.dna" %% "lakehouse-core" % "2.0.3",
+      "common-utils",
+      "dataplatform-core",
+      "lakehouse-core",
       // Test only
-      "ct.dna" %% "local-spark-runtime" % "17.3.0" % Test,
+      "local-spark-runtime" % Test
+    ),
+    libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )
   )
 
+// will be reanmeded to devops later: this will contain the code to all ColumnWithNameAccessors and also ghe related scala files (deployment, ...)
 lazy val cicd = project
   .in(file("cicd"))
   .dependsOn(lakehouse)
@@ -51,17 +56,23 @@ lazy val cicd = project
     name := "cicd",
     run / fork := true,
     assembly / skip := true,
+    useDnaBom(dnaBomVersion)(
+      "deploy-utils",
+      "lakehouse-modelbuilder",
+      "local-spark-runtime"
+    ),
     libraryDependencies ++= Seq(
-      "ct.dna" %% "deploy-utils" % "1.13.1",
-      "ct.dna" %% "lakehouse-modelbuilder" % "1.2.1",
-      "ct.dna" %% "local-spark-runtime" % "17.3.0",
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )
   )
 
 lazy val root = project
   .in(file("."))
-  .aggregate(lakehouse, cicd)
+  .aggregate(
+    // srGenerator,
+    lakehouse,
+    cicd
+  )
   .settings(
     assembly / skip := true,
     name := "multi-project-root"

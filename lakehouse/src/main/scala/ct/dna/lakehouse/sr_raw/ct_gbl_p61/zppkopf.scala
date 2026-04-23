@@ -1,0 +1,259 @@
+// AUTO GENERATED CODE - DO NOT EDIT
+package ct.dna.lakehouse.sr_raw.ct_gbl_p61
+
+import ct.dna.lakehouse.core.framework.origin.Loaded
+import ct.dna.lakehouse.core.model.Entity
+import ct.dna.lakehouse.core.model.Entity._
+import ct.dna.lakehouse.core.model.TableSpec
+
+case class E_zppkopf(
+    @PK _mk_org: String,
+    @PK _mk_site: String,
+    @PK _mk_system: String,
+    @PK _mk_instance: String,
+    @PK _mk_partition: String,
+    @PK _mk_file: String,
+    @NotNull _mk_container: String,
+    @NotNull _mk_account: String,
+    @NotNull _mk_created_at: Timestamp,
+    @PK _lh_id_in_message: Long,
+    _lh_ingest_warning: String,
+    mandt_string: String,
+    peauf_string: String,
+    werks_string: String,
+    maktx_string: String,
+    dimens_string: String,
+    entwickler_string: String,
+    bdatum_string: String,
+    aufstatus_string: String,
+    sdorder_string: String,
+    kunde_string: String,
+    kundteilnr_string: String,
+    ausfuehrung_string: String,
+    abtrommel_string: String,
+    abtrommeltext_string: String,
+    vulkform_string: String,
+    vulkformtext_string: String,
+    vulkpgm_string: String,
+    vulkbem_string: String,
+    @Decimal(3, 0) amenge_decimal_3_0: BigDecimal,
+    erdatum_string: String,
+    bdatumv_string: String,
+    fertigung_string: String,
+    kennz01_string: String,
+    kennz02_string: String,
+    kennz03_string: String,
+    kennz04_string: String,
+    kennz05_string: String,
+    kennz06_string: String,
+    kennz07_string: String,
+    kennz08_string: String,
+    kennz09_string: String,
+    kennz10_string: String,
+    @Decimal(5, 2) riemenbr01_decimal_5_2: BigDecimal,
+    @Decimal(2, 0) riemenrip01_decimal_2_0: BigDecimal,
+    @Decimal(3, 0) riemanz01_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) messlast01_decimal_3_0: BigDecimal,
+    @Decimal(5, 2) riemenbr02_decimal_5_2: BigDecimal,
+    @Decimal(2, 0) riemenrip02_decimal_2_0: BigDecimal,
+    @Decimal(3, 0) riemanz02_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) messlast02_decimal_3_0: BigDecimal,
+    @Decimal(5, 2) riemenbr03_decimal_5_2: BigDecimal,
+    @Decimal(2, 0) riemenrip03_decimal_2_0: BigDecimal,
+    @Decimal(3, 0) riemanz03_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) messlast03_decimal_3_0: BigDecimal,
+    @Decimal(5, 2) riemenbr04_decimal_5_2: BigDecimal,
+    @Decimal(2, 0) riemenrip04_decimal_2_0: BigDecimal,
+    @Decimal(3, 0) riemanz04_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) messlast04_decimal_3_0: BigDecimal,
+    @Decimal(5, 2) riemenbr05_decimal_5_2: BigDecimal,
+    @Decimal(2, 0) riemenrip05_decimal_2_0: BigDecimal,
+    @Decimal(3, 0) riemanz05_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) messlast05_decimal_3_0: BigDecimal,
+    @Decimal(4, 0) messlen_decimal_4_0: BigDecimal,
+    rbemerk_string: String,
+    @Decimal(3, 2) messbrtolp_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) messbrtolm_decimal_3_2: BigDecimal,
+    @Decimal(4, 2) riemhoehe_decimal_4_2: BigDecimal,
+    @Decimal(3, 2) riemhoehetolp_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) riemhoehetolm_decimal_3_2: BigDecimal,
+    @Decimal(4, 2) messstgh_decimal_4_2: BigDecimal,
+    @Decimal(3, 2) messstgtolp_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) messstgtolm_decimal_3_2: BigDecimal,
+    @Decimal(4, 2) zahnhoeh_decimal_4_2: BigDecimal,
+    @Decimal(3, 2) zahnhtolp_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) zahnhtolm_decimal_3_2: BigDecimal,
+    @Decimal(3, 0) zzriehmen_decimal_3_0: BigDecimal,
+    @Decimal(5, 3) teilung_decimal_5_3: BigDecimal,
+    @Decimal(2, 0) mrzaehne_decimal_2_0: BigDecimal,
+    mrprofil_string: String,
+    @Decimal(5, 2) achsab_decimal_5_2: BigDecimal,
+    achsabtolpvz_string: String,
+    @Decimal(3, 2) achsabtolp_decimal_3_2: BigDecimal,
+    achsabtolmvz_string: String,
+    @Decimal(3, 2) achsabtolm_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) seitenschlag_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) schlag_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) ablauf_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) rlentolp_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) rlentolm_decimal_3_2: BigDecimal,
+    @Decimal(4, 0) messkraft_decimal_4_0: BigDecimal,
+    @Decimal(3, 0) messkrafttolp_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) messkrafttolm_decimal_3_0: BigDecimal,
+    @Decimal(3, 2) deltastoss_decimal_3_2: BigDecimal,
+    @Decimal(3, 2) deltalire_decimal_3_2: BigDecimal,
+    exawert_string: String,
+    @Decimal(3, 0) buerstzeit_decimal_3_0: BigDecimal,
+    pdate01_string: String,
+    @Decimal(3, 0) gute01_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) abfall01_decimal_3_0: BigDecimal,
+    pbem01_string: String,
+    pdate02_string: String,
+    @Decimal(3, 0) gute02_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) abfall02_decimal_3_0: BigDecimal,
+    pbem02_string: String,
+    pdate03_string: String,
+    @Decimal(3, 0) gute03_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) abfall03_decimal_3_0: BigDecimal,
+    pbem03_string: String,
+    pdate04_string: String,
+    @Decimal(3, 0) gute04_decimal_3_0: BigDecimal,
+    @Decimal(3, 0) abfall04_decimal_3_0: BigDecimal,
+    pbem04_string: String,
+    spezityp_string: String,
+    maildate_string: String,
+    fue_memo_string: String
+) extends Entity
+
+object zppkopf extends TableSpec[E_zppkopf](enableChangeDataFeed = true, manualClusterBy = None, timetravelDays = 35) with Loaded
+
+// AUTO GENERATED:START
+// Generated by ColumnWithNameAccessorEmbeddedAstBuilder - DO NOT EDIT MANUALLY
+
+import ct.dna.lakehouse.core.model.ColumnWithName
+import ct.dna.lakehouse.core.model.ColumnWithNameAccessor
+
+sealed class C_zppkopf(prefix: String) extends ColumnWithNameAccessor {
+  val _mk_org: ColumnWithName = ColumnWithName(prefix + "_mk_org")
+  val _mk_site: ColumnWithName = ColumnWithName(prefix + "_mk_site")
+  val _mk_system: ColumnWithName = ColumnWithName(prefix + "_mk_system")
+  val _mk_instance: ColumnWithName = ColumnWithName(prefix + "_mk_instance")
+  val _mk_partition: ColumnWithName = ColumnWithName(prefix + "_mk_partition")
+  val _mk_file: ColumnWithName = ColumnWithName(prefix + "_mk_file")
+  val _mk_container: ColumnWithName = ColumnWithName(prefix + "_mk_container")
+  val _mk_account: ColumnWithName = ColumnWithName(prefix + "_mk_account")
+  val _mk_created_at: ColumnWithName = ColumnWithName(prefix + "_mk_created_at")
+  val _lh_id_in_message: ColumnWithName = ColumnWithName(prefix + "_lh_id_in_message")
+  val _lh_ingest_warning: ColumnWithName = ColumnWithName(prefix + "_lh_ingest_warning")
+  val mandt_string: ColumnWithName = ColumnWithName(prefix + "mandt_string")
+  val peauf_string: ColumnWithName = ColumnWithName(prefix + "peauf_string")
+  val werks_string: ColumnWithName = ColumnWithName(prefix + "werks_string")
+  val maktx_string: ColumnWithName = ColumnWithName(prefix + "maktx_string")
+  val dimens_string: ColumnWithName = ColumnWithName(prefix + "dimens_string")
+  val entwickler_string: ColumnWithName = ColumnWithName(prefix + "entwickler_string")
+  val bdatum_string: ColumnWithName = ColumnWithName(prefix + "bdatum_string")
+  val aufstatus_string: ColumnWithName = ColumnWithName(prefix + "aufstatus_string")
+  val sdorder_string: ColumnWithName = ColumnWithName(prefix + "sdorder_string")
+  val kunde_string: ColumnWithName = ColumnWithName(prefix + "kunde_string")
+  val kundteilnr_string: ColumnWithName = ColumnWithName(prefix + "kundteilnr_string")
+  val ausfuehrung_string: ColumnWithName = ColumnWithName(prefix + "ausfuehrung_string")
+  val abtrommel_string: ColumnWithName = ColumnWithName(prefix + "abtrommel_string")
+  val abtrommeltext_string: ColumnWithName = ColumnWithName(prefix + "abtrommeltext_string")
+  val vulkform_string: ColumnWithName = ColumnWithName(prefix + "vulkform_string")
+  val vulkformtext_string: ColumnWithName = ColumnWithName(prefix + "vulkformtext_string")
+  val vulkpgm_string: ColumnWithName = ColumnWithName(prefix + "vulkpgm_string")
+  val vulkbem_string: ColumnWithName = ColumnWithName(prefix + "vulkbem_string")
+  val amenge_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "amenge_decimal_3_0")
+  val erdatum_string: ColumnWithName = ColumnWithName(prefix + "erdatum_string")
+  val bdatumv_string: ColumnWithName = ColumnWithName(prefix + "bdatumv_string")
+  val fertigung_string: ColumnWithName = ColumnWithName(prefix + "fertigung_string")
+  val kennz01_string: ColumnWithName = ColumnWithName(prefix + "kennz01_string")
+  val kennz02_string: ColumnWithName = ColumnWithName(prefix + "kennz02_string")
+  val kennz03_string: ColumnWithName = ColumnWithName(prefix + "kennz03_string")
+  val kennz04_string: ColumnWithName = ColumnWithName(prefix + "kennz04_string")
+  val kennz05_string: ColumnWithName = ColumnWithName(prefix + "kennz05_string")
+  val kennz06_string: ColumnWithName = ColumnWithName(prefix + "kennz06_string")
+  val kennz07_string: ColumnWithName = ColumnWithName(prefix + "kennz07_string")
+  val kennz08_string: ColumnWithName = ColumnWithName(prefix + "kennz08_string")
+  val kennz09_string: ColumnWithName = ColumnWithName(prefix + "kennz09_string")
+  val kennz10_string: ColumnWithName = ColumnWithName(prefix + "kennz10_string")
+  val riemenbr01_decimal_5_2: ColumnWithName = ColumnWithName(prefix + "riemenbr01_decimal_5_2")
+  val riemenrip01_decimal_2_0: ColumnWithName = ColumnWithName(prefix + "riemenrip01_decimal_2_0")
+  val riemanz01_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "riemanz01_decimal_3_0")
+  val messlast01_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messlast01_decimal_3_0")
+  val riemenbr02_decimal_5_2: ColumnWithName = ColumnWithName(prefix + "riemenbr02_decimal_5_2")
+  val riemenrip02_decimal_2_0: ColumnWithName = ColumnWithName(prefix + "riemenrip02_decimal_2_0")
+  val riemanz02_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "riemanz02_decimal_3_0")
+  val messlast02_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messlast02_decimal_3_0")
+  val riemenbr03_decimal_5_2: ColumnWithName = ColumnWithName(prefix + "riemenbr03_decimal_5_2")
+  val riemenrip03_decimal_2_0: ColumnWithName = ColumnWithName(prefix + "riemenrip03_decimal_2_0")
+  val riemanz03_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "riemanz03_decimal_3_0")
+  val messlast03_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messlast03_decimal_3_0")
+  val riemenbr04_decimal_5_2: ColumnWithName = ColumnWithName(prefix + "riemenbr04_decimal_5_2")
+  val riemenrip04_decimal_2_0: ColumnWithName = ColumnWithName(prefix + "riemenrip04_decimal_2_0")
+  val riemanz04_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "riemanz04_decimal_3_0")
+  val messlast04_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messlast04_decimal_3_0")
+  val riemenbr05_decimal_5_2: ColumnWithName = ColumnWithName(prefix + "riemenbr05_decimal_5_2")
+  val riemenrip05_decimal_2_0: ColumnWithName = ColumnWithName(prefix + "riemenrip05_decimal_2_0")
+  val riemanz05_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "riemanz05_decimal_3_0")
+  val messlast05_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messlast05_decimal_3_0")
+  val messlen_decimal_4_0: ColumnWithName = ColumnWithName(prefix + "messlen_decimal_4_0")
+  val rbemerk_string: ColumnWithName = ColumnWithName(prefix + "rbemerk_string")
+  val messbrtolp_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "messbrtolp_decimal_3_2")
+  val messbrtolm_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "messbrtolm_decimal_3_2")
+  val riemhoehe_decimal_4_2: ColumnWithName = ColumnWithName(prefix + "riemhoehe_decimal_4_2")
+  val riemhoehetolp_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "riemhoehetolp_decimal_3_2")
+  val riemhoehetolm_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "riemhoehetolm_decimal_3_2")
+  val messstgh_decimal_4_2: ColumnWithName = ColumnWithName(prefix + "messstgh_decimal_4_2")
+  val messstgtolp_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "messstgtolp_decimal_3_2")
+  val messstgtolm_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "messstgtolm_decimal_3_2")
+  val zahnhoeh_decimal_4_2: ColumnWithName = ColumnWithName(prefix + "zahnhoeh_decimal_4_2")
+  val zahnhtolp_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "zahnhtolp_decimal_3_2")
+  val zahnhtolm_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "zahnhtolm_decimal_3_2")
+  val zzriehmen_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "zzriehmen_decimal_3_0")
+  val teilung_decimal_5_3: ColumnWithName = ColumnWithName(prefix + "teilung_decimal_5_3")
+  val mrzaehne_decimal_2_0: ColumnWithName = ColumnWithName(prefix + "mrzaehne_decimal_2_0")
+  val mrprofil_string: ColumnWithName = ColumnWithName(prefix + "mrprofil_string")
+  val achsab_decimal_5_2: ColumnWithName = ColumnWithName(prefix + "achsab_decimal_5_2")
+  val achsabtolpvz_string: ColumnWithName = ColumnWithName(prefix + "achsabtolpvz_string")
+  val achsabtolp_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "achsabtolp_decimal_3_2")
+  val achsabtolmvz_string: ColumnWithName = ColumnWithName(prefix + "achsabtolmvz_string")
+  val achsabtolm_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "achsabtolm_decimal_3_2")
+  val seitenschlag_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "seitenschlag_decimal_3_2")
+  val schlag_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "schlag_decimal_3_2")
+  val ablauf_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "ablauf_decimal_3_2")
+  val rlentolp_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "rlentolp_decimal_3_2")
+  val rlentolm_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "rlentolm_decimal_3_2")
+  val messkraft_decimal_4_0: ColumnWithName = ColumnWithName(prefix + "messkraft_decimal_4_0")
+  val messkrafttolp_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messkrafttolp_decimal_3_0")
+  val messkrafttolm_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "messkrafttolm_decimal_3_0")
+  val deltastoss_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "deltastoss_decimal_3_2")
+  val deltalire_decimal_3_2: ColumnWithName = ColumnWithName(prefix + "deltalire_decimal_3_2")
+  val exawert_string: ColumnWithName = ColumnWithName(prefix + "exawert_string")
+  val buerstzeit_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "buerstzeit_decimal_3_0")
+  val pdate01_string: ColumnWithName = ColumnWithName(prefix + "pdate01_string")
+  val gute01_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "gute01_decimal_3_0")
+  val abfall01_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "abfall01_decimal_3_0")
+  val pbem01_string: ColumnWithName = ColumnWithName(prefix + "pbem01_string")
+  val pdate02_string: ColumnWithName = ColumnWithName(prefix + "pdate02_string")
+  val gute02_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "gute02_decimal_3_0")
+  val abfall02_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "abfall02_decimal_3_0")
+  val pbem02_string: ColumnWithName = ColumnWithName(prefix + "pbem02_string")
+  val pdate03_string: ColumnWithName = ColumnWithName(prefix + "pdate03_string")
+  val gute03_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "gute03_decimal_3_0")
+  val abfall03_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "abfall03_decimal_3_0")
+  val pbem03_string: ColumnWithName = ColumnWithName(prefix + "pbem03_string")
+  val pdate04_string: ColumnWithName = ColumnWithName(prefix + "pdate04_string")
+  val gute04_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "gute04_decimal_3_0")
+  val abfall04_decimal_3_0: ColumnWithName = ColumnWithName(prefix + "abfall04_decimal_3_0")
+  val pbem04_string: ColumnWithName = ColumnWithName(prefix + "pbem04_string")
+  val spezityp_string: ColumnWithName = ColumnWithName(prefix + "spezityp_string")
+  val maildate_string: ColumnWithName = ColumnWithName(prefix + "maildate_string")
+  val fue_memo_string: ColumnWithName = ColumnWithName(prefix + "fue_memo_string")
+}
+
+object C_zppkopf extends C_zppkopf("") {
+  def as(alias: String): C_zppkopf = new C_zppkopf(alias + ".")
+}
+
+// AUTO GENERATED:END

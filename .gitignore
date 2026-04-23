@@ -20,6 +20,9 @@ sbt-launch.jar
 */src/test/resources/test-config.json.*
 !*/src/test/resources/test-config.json.template
 
+# ignore local run scripts
+run-all-tables.sh
+
 # ignore secrets
 cicd/src/main/resources/*.json
 cicd/src/main/resources/deployment/configFiles/*.json
@@ -29,3 +32,12 @@ cicd/src/main/resources/deployment/configFiles/*.json
 .databricks/*
 
 
+config/config.json
+run-fin-hawk-sr.sh
+run-fin-hawk-dm.sh
+schema_config.json
+src_schemas.sh
+result_columns.json
+DWTxYAMLGenerator.scala
+**/DWTxYAMLGenerator.scala
+**/DwTxYamlGenerator.scala

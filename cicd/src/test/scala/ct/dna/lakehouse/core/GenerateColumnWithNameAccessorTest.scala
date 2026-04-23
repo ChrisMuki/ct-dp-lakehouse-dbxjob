@@ -8,13 +8,15 @@ import scala.jdk.CollectionConverters._
 
 import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.TableSpec
-import ct.dna.lakehouse.core.modelbuilder.ColumnWithNameAccessorEmbeddedAstBuilder
 import ct.dna.lakehouse.core.testfixtures.columnaccessor.testcat.testschema.alpha
 import ct.dna.lakehouse.core.testfixtures.columnaccessor.testcat.testschema.beta
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
+
+  private val StartMarker = "// AUTO GENERATED:START"
+  private val EndMarker = "// AUTO GENERATED:END"
 
   private val basePackage = "ct.dna.lakehouse.core.testfixtures.columnaccessor.testcat.testschema"
 
@@ -38,16 +40,16 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
 
       val appendedSpec = alpha
       val appendedContent = readScalaFile(baseDir, appendedSpec)
-      appendedContent should include(ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker)
-      appendedContent should include(ColumnWithNameAccessorEmbeddedAstBuilder.EndMarker)
+      appendedContent should include(StartMarker)
+      appendedContent should include(EndMarker)
       appendedContent should include(s"sealed class C_${appendedSpec.id.name}(prefix: String) extends ColumnWithNameAccessor")
       appendedContent should include(s"""object C_${appendedSpec.id.name} extends C_${appendedSpec.id.name}("")""")
       appendedContent should include("""val id: ColumnWithName = ColumnWithName(prefix + "id")""")
       appendedContent should include("""val value: ColumnWithName = ColumnWithName(prefix + "value")""")
 
       val replacedContent = readScalaFile(baseDir, replaceSpec)
-      replacedContent should include(ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker)
-      replacedContent should include(ColumnWithNameAccessorEmbeddedAstBuilder.EndMarker)
+      replacedContent should include(StartMarker)
+      replacedContent should include(EndMarker)
       replacedContent should not include "old generated content"
       replacedContent should include(s"sealed class C_${replaceSpec.id.name}(prefix: String) extends ColumnWithNameAccessor")
       replacedContent should include("""val key: ColumnWithName = ColumnWithName(prefix + "key")""")
@@ -98,7 +100,7 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
 
       val successfulSpec = alpha
       val successfulContent = readScalaFile(baseDir, successfulSpec)
-      successfulContent should include(ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker)
+      successfulContent should include(StartMarker)
       successfulContent should include(s"sealed class C_${successfulSpec.id.name}(prefix: String) extends ColumnWithNameAccessor")
 
       val stillBrokenContent = readScalaFile(baseDir, brokenSpec)
@@ -110,7 +112,7 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
   }
 
   private def runMain(baseDir: Path): Unit = {
-    ColumnWithNameAccessor.main(
+    GenerateColumnWithNameAccessor.main(
       Array(
         s"baseDir=$baseDir",
         s"basePackage=$basePackage"
@@ -158,9 +160,9 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
        |  val keepMe = 1
        |}
        |
-       |${ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker}
+       |${StartMarker}
        |$generatedContent
-       |${ColumnWithNameAccessorEmbeddedAstBuilder.EndMarker}
+       |${EndMarker}
        |""".stripMargin
   }
 
@@ -174,11 +176,11 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
        |  val keepMe = 1
        |}
        |
-       |${ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker}
+       |${StartMarker}
        |broken generated content A
-       |${ColumnWithNameAccessorEmbeddedAstBuilder.StartMarker}
+       |${StartMarker}
        |broken generated content B
-       |${ColumnWithNameAccessorEmbeddedAstBuilder.EndMarker}
+       |${EndMarker}
        |""".stripMargin
   }
 
