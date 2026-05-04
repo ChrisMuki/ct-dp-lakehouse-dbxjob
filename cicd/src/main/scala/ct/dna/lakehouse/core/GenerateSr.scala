@@ -1,15 +1,18 @@
 package ct.dna.lakehouse.core
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
+import java.nio.file.Files
+import java.nio.file.Paths
 
 import scala.jdk.CollectionConverters._
 
-import ct.dna.lakehouse.core.jobs.{ColumnSource, SrRawFieldInfo, SrTableDef}
+import ct.dna.lakehouse.core.jobs.ColumnSource
+import ct.dna.lakehouse.core.jobs.SrRawFieldInfo
+import ct.dna.lakehouse.core.jobs.SrTableDef
 import ct.dna.lakehouse.core.modelbuilder.ChangeKeyTableSpecAstBuilder
 import ct.dna.utils.LocalDir
-import ct.dna.utils.LoggingTrait
 import ct.dna.utils.json.mapper
+import ct.dna.utils.logging.LoggingTrait
 import ct.dna.utils.runtime.Configuration
 
 /** Generates sr/<schema>/<table>.scala files from sr_table_def.json, using the ChangeKey AST builder.

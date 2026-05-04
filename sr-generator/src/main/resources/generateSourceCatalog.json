@@ -1,0 +1,16 @@
+{
+    "sparkConfig": {
+        "stage": "prod",
+        "clazz": "RemoteLakehouse",
+        "workspaceUrl": "adb-7405618773642751.11.azuredatabricks.net",
+        "clusterId": "0331-142042-eqlnxkvl",
+        "azAuth": "AzureCli"
+    },
+    "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/ct/dna/lakehouse",
+    "basePackage": "ct.dna.lakehouse",
+    "theobaldJson": "theobald.json",
+    "cdcJson": "cdc.json",
+    "otherJsons": [],
+    "skipUnconfiguredTable": "true",
+    "skipUnusedColumnMod": "true"
+}

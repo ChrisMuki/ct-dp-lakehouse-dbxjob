@@ -13,6 +13,9 @@
         // "terminal.integrated.defaultProfile.linux": "zsh",
         "metals.javaVersion": "17",
         "metals.fallbackScalaVersion": "2.13.16",
+        "workbench.externalUriOpeners": {
+          "*": "simpleBrowser.show"
+        },
         "metals.serverProperties": [
           "-Xmx2G",
           "-XX:+UseZGC",

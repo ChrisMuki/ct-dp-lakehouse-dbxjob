@@ -1,8 +1,8 @@
 package ct.dna.lakehouse.core
 
-import ct.dna.lakehouse.core.framework.origin.GenericMergedInto
 import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.TableSpec
+import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.core.model.internal.findAllObjectsOfType
 
 /** Discovers DM table dependencies by reflecting on `sourceTableSpecs` in a given schema package.
@@ -28,8 +28,8 @@ object DmDependencyResolver {
     // Extract DM-internal dependencies for each table
     val deps: Map[String, Set[String]] = allSpecs.map { spec =>
       val dmDeps = spec match {
-        case merged: GenericMergedInto =>
-          merged.sourceTableSpecs
+        case spec: Updated =>
+          spec.sourceTableSpecs
             .map(_.id.name)
             .filter(dmNames.contains)
             .toSet - spec.id.name // exclude self-references

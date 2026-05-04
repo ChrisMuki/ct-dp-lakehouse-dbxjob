@@ -1,11 +1,14 @@
 package ct.dna.lakehouse.core
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
+import java.nio.file.Files
+import java.nio.file.Path
 
 import scala.jdk.CollectionConverters._
 
-import ct.dna.lakehouse.core.jobs.{ColumnDefinition, ColumnSource, SrRawFieldInfo}
+import ct.dna.lakehouse.core.jobs.ColumnDefinition
+import ct.dna.lakehouse.core.jobs.ColumnSource
+import ct.dna.lakehouse.core.jobs.SrRawFieldInfo
 import ct.dna.lakehouse.core.modelbuilder.ChangeKeyTableSpecAstBuilder
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

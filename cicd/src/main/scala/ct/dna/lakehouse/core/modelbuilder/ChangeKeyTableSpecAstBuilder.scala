@@ -1,9 +1,11 @@
 package ct.dna.lakehouse.core.modelbuilder
 
-import ct.dna.lakehouse.core.jobs.{ColumnDefinition, ColumnSource, SrRawFieldInfo}
-import ct.dna.dataplatform.NamingConvention
-
 import scala.collection.mutable
+
+import ct.dna.dataplatform.NamingConvention
+import ct.dna.lakehouse.core.jobs.ColumnDefinition
+import ct.dna.lakehouse.core.jobs.ColumnSource
+import ct.dna.lakehouse.core.jobs.SrRawFieldInfo
 
 object ChangeKeyTableSpecAstBuilder {
 
@@ -154,7 +156,7 @@ ${tableObject.render}
   // ---------- Type mapping (configured source column → SR field + source expression) ----------
 
   private def resolveSourceFieldName(col: ColumnDefinition, srRawFieldNames: Set[String]): Option[String] = {
-    val baseName = col.name.toLowerCase.replaceAll("_+$", "")
+    val baseName = col.name.toLowerCase
     val candidateNames = col.columnType match {
       case "Date" =>
         if (srRawFieldNames.isEmpty || srRawFieldNames.contains(s"${baseName}_string")) Seq(s"${baseName}_string", s"${baseName}_date")
@@ -234,13 +236,7 @@ ${tableObject.render}
       case _ => None
     }
     val isPK = col.isPrimaryKey && col.name != "MANDT"
-    val safeColExpr = scalaType match {
-      case "String" if isPK   => s"""coalesce($colExpr, lit(""))"""
-      case "Int" | "Long"     => s"""coalesce($colExpr, lit(0))"""
-      case "Float" | "Double" => s"""coalesce($colExpr, lit(0.0))"""
-      case "Boolean"          => s"""coalesce($colExpr, lit(false))"""
-      case _                  => colExpr
-    }
+    val safeColExpr = if (isPK && scalaType == "String") s"""coalesce($colExpr, lit(""))""".trim else colExpr
     SrField(
       fieldName = safeFieldName(col.name),
       scalaType = scalaType,
@@ -251,10 +247,9 @@ ${tableObject.render}
   }
 
   private def toPassthroughSrField(srRawField: SrRawFieldInfo): SrField = {
-    val annotation = srRawField.decimalAnnotation.orElse {
+    val annotation =
       if (supportsNotNullAnnotation(srRawField.scalaType) && (srRawField.isNotNull || srRawField.isPrimaryKey)) Some("@NotNull")
       else None
-    }
 
     SrField(
       fieldName = srRawField.name,

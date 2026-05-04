@@ -1,9 +1,0 @@
-{
-    "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/ct/dna/lakehouse/sr",
-    "basePackage": "ct.dna.lakehouse.sr",
-    "srTableDefPath": "/workspaces/dp-lakehouse-dbxjob/resources/sr/sr_table_def.json",
-    "srRawBaseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/ct/dna/lakehouse/sr_raw",
-    "filterSchema": "",
-    "filterTable": ""
-}
- 

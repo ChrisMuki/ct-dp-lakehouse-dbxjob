@@ -1,9 +1,12 @@
 package ct.dna.lakehouse.dm_md.fin_hawk
 
-import ct.dna.lakehouse.core.framework.{ChangeFeed, Result, Table}
-import ct.dna.lakehouse.core.framework.origin.Updated
-import ct.dna.lakehouse.core.model.{Entity, TableSpec}
+import ct.dna.lakehouse.core.framework.ChangeFeed
+import ct.dna.lakehouse.core.framework.Result
+import ct.dna.lakehouse.core.framework.Table
+import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.Entity.PK
+import ct.dna.lakehouse.core.model.TableSpec
+import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.sr.ct_gbl_e32.{t001k => t001k_e32}
 import ct.dna.lakehouse.sr.ct_gbl_epp.{t001k => t001k_epp}
 import ct.dna.lakehouse.sr.ct_gbl_ghp.{t001k => t001k_ghp}
@@ -17,7 +20,6 @@ import ct.dna.lakehouse.sr.ct_gbl_p77.{t001k => t001k_p77}
 import ct.dna.lakehouse.sr.ct_gbl_p85.{t001k => t001k_p85}
 import ct.dna.lakehouse.sr.ct_gbl_pbr.{t001k => t001k_pbr}
 import ct.dna.lakehouse.sr.ct_gbl_psp.{t001k => t001k_psp}
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
 case class DmT001K(

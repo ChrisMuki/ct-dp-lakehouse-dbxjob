@@ -1,9 +1,12 @@
 package ct.dna.lakehouse.dm_md.fin_hawk
 
-import ct.dna.lakehouse.core.framework.{ChangeFeed, Result, Table}
-import ct.dna.lakehouse.core.framework.origin.Updated
-import ct.dna.lakehouse.core.model.{Entity, TableSpec}
+import ct.dna.lakehouse.core.framework.ChangeFeed
+import ct.dna.lakehouse.core.framework.Result
+import ct.dna.lakehouse.core.framework.Table
+import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.Entity.PK
+import ct.dna.lakehouse.core.model.TableSpec
+import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.sr.ct_gbl_e32.{marc => marc_e32}
 import ct.dna.lakehouse.sr.ct_gbl_epp.{marc => marc_epp}
 import ct.dna.lakehouse.sr.ct_gbl_ghp.{marc => marc_ghp}

@@ -6,10 +6,10 @@ import java.nio.file.Paths
 import com.fasterxml.jackson.annotation.JsonInclude
 import ct.dna.lakehouse.cicd.models.ConfigFile
 import ct.dna.lakehouse.cicd.models.DeploymentConfig
-import ct.dna.lakehouse.sr.{`package` => srCatalog}
 import ct.dna.lakehouse.core.HawkWorkflowBuilder
 import ct.dna.lakehouse.core.SrWorkflowBuilder
 import ct.dna.lakehouse.core.runtime.SparkConfig
+import ct.dna.lakehouse.sr.{`package` => srCatalog}
 import ct.dna.utils.LocalDir
 import ct.dna.utils.LoggingTrait
 import ct.dna.utils.ResourceLoader

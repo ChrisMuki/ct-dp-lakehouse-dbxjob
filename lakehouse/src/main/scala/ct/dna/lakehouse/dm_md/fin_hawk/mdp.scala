@@ -1,24 +1,23 @@
 package ct.dna.lakehouse.dm_md.fin_hawk
 
-import ct.dna.lakehouse.core.framework.{ChangeFeed, Result, Table}
-import ct.dna.lakehouse.core.framework.origin.Updated
-import ct.dna.lakehouse.core.model.Entity.{Decimal, PK}
-import ct.dna.lakehouse.core.model.{Entity, TableSpec}
+import ct.dna.lakehouse.core.framework.ChangeFeed
+import ct.dna.lakehouse.core.framework.Result
+import ct.dna.lakehouse.core.framework.Table
+import ct.dna.lakehouse.core.model.Entity
+import ct.dna.lakehouse.core.model.Entity.PK
+import ct.dna.lakehouse.core.model.TableSpec
+import ct.dna.lakehouse.core.model.Updated
+import ct.dna.lakehouse.dm_md.fin_hawk.{makt => dm_makt}
+import ct.dna.lakehouse.dm_md.fin_hawk.{mara => dm_mara}
 import ct.dna.lakehouse.dm_md.fin_hawk.{marc => dm_marc}
 import ct.dna.lakehouse.dm_md.fin_hawk.{mdm => dm_mdm}
-import ct.dna.lakehouse.dm_md.fin_hawk.{mara => dm_mara}
-import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
-import ct.dna.lakehouse.dm_md.fin_hawk.{t001w => dm_t001w}
-import ct.dna.lakehouse.dm_md.fin_hawk.{t001k => dm_t001k}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t001 => dm_t001}
-import ct.dna.lakehouse.dm_md.fin_hawk.{makt => dm_makt}
-// TODO: Uncomment once available in sr_raw
-// import ct.dna.lakehouse.sr_raw.ct_it_test.{countries_ww_fixed => countries_ww}
-// import ct.dna.lakehouse.sr_raw.ct_it_test.{sap_systems => sap_systems}
-import ct.dna.lakehouse.core.runtime.SparkEnv
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.SparkSession
+import ct.dna.lakehouse.dm_md.fin_hawk.{t001k => dm_t001k}
+import ct.dna.lakehouse.dm_md.fin_hawk.{t001w => dm_t001w}
+import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
 
 case class DmMdp(
     _mk_system: String,

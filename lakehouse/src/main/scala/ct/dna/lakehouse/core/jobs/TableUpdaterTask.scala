@@ -1,12 +1,12 @@
 package ct.dna.lakehouse.core.jobs
 
-import ct.dna.lakehouse.core.catalog.internal.TableManager
-import ct.dna.lakehouse.core.framework.internal.TableUpdater
-import ct.dna.lakehouse.core.framework.origin.GenericMergedInto
-import ct.dna.lakehouse.core.model.{Entity, TableSpec}
+import ct.dna.lakehouse.core.framework.internal.TableManager
+import ct.dna.lakehouse.core.framework.internal.UpdatedTableProcessor
+import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.core.runtime.SparkEnv
-import ct.dna.utils.runtime.{Configuration, Task}
 import ct.dna.lakehouse.core.runtime.implicits._
+import ct.dna.utils.runtime.Configuration
+import ct.dna.utils.runtime.Task
 import org.apache.spark.sql.SparkSession
 
 final class TableUpdaterTask(
@@ -14,6 +14,9 @@ final class TableUpdaterTask(
     packageName: String,
     tableName: String
 ) extends Task {
+
+  val logicVersion: String =
+    "1.0" // to be used for compatibility checks between code and persisted metadata, e.g. to enforce full recreate if logic has changed in a non-compatible way
 
   val forceRecreate: Boolean = false // maybe something proper like version checks between target umd and current code?
   // not yet properly supported by the framework, will be used to enforce complete recalculation of the target
@@ -43,8 +46,8 @@ final class TableUpdaterTask(
       if (foundClass.getName.endsWith("$")) {
         val module = foundClass.getField("MODULE$").get(null)
         module match {
-          case ts: TableSpec[Entity] with GenericMergedInto => Some(ts)
-          case _                                            => None
+          case ts: Updated => Some(ts)
+          case _           => None
         }
       } else None
     }.getOrElse(throw new ClassNotFoundException(s"Could not find TableSpec for $packageName.$tableName"))
@@ -52,12 +55,12 @@ final class TableUpdaterTask(
     tableSpec.validateToRoot()
 
     if (forceRecreate)
-      TableManager(runId).createAsTarget(tableSpec)
+      TableManager(runId).createUpdated(tableSpec, asTarget = true)
     else
-      TableManager(runId).ensureExistsAndBackupOld(tableSpec)
+      TableManager(runId).ensureUpdatedTableAsNeeded(tableSpec, asTarget = true)
 
     // Execute update
-    TableUpdater(runId).update(tableSpec)
+    UpdatedTableProcessor(runId).update(tableSpec, logicVersion)
     // later on we will pass forceRecreate to the update method
 
     logger.info(s"Update completed for $uid")

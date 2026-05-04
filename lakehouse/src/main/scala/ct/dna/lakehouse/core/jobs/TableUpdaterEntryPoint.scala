@@ -1,7 +1,7 @@
 package ct.dna.lakehouse.core.jobs
 
-import ct.dna.utils.runtime.TaskEntryPoint
 import ct.dna.utils.runtime.Task
+import ct.dna.utils.runtime.TaskEntryPoint
 
 object TableUpdaterEntryPoint extends TaskEntryPoint {
 

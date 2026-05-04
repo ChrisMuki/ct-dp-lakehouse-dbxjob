@@ -10,6 +10,7 @@ import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.testfixtures.columnaccessor.testcat.testschema.alpha
 import ct.dna.lakehouse.core.testfixtures.columnaccessor.testcat.testschema.beta
+import ct.dna.lakehouse.srGenerator.ColumnAccessorMarkerConfig
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -40,16 +41,16 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
 
       val appendedSpec = alpha
       val appendedContent = readScalaFile(baseDir, appendedSpec)
-      appendedContent should include(StartMarker)
-      appendedContent should include(EndMarker)
+      appendedContent should include(ColumnAccessorMarkerConfig.startMarker)
+      appendedContent should include(ColumnAccessorMarkerConfig.endMarker)
       appendedContent should include(s"sealed class C_${appendedSpec.id.name}(prefix: String) extends ColumnWithNameAccessor")
       appendedContent should include(s"""object C_${appendedSpec.id.name} extends C_${appendedSpec.id.name}("")""")
       appendedContent should include("""val id: ColumnWithName = ColumnWithName(prefix + "id")""")
       appendedContent should include("""val value: ColumnWithName = ColumnWithName(prefix + "value")""")
 
       val replacedContent = readScalaFile(baseDir, replaceSpec)
-      replacedContent should include(StartMarker)
-      replacedContent should include(EndMarker)
+      replacedContent should include(ColumnAccessorMarkerConfig.startMarker)
+      replacedContent should include(ColumnAccessorMarkerConfig.endMarker)
       replacedContent should not include "old generated content"
       replacedContent should include(s"sealed class C_${replaceSpec.id.name}(prefix: String) extends ColumnWithNameAccessor")
       replacedContent should include("""val key: ColumnWithName = ColumnWithName(prefix + "key")""")
@@ -100,7 +101,7 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
 
       val successfulSpec = alpha
       val successfulContent = readScalaFile(baseDir, successfulSpec)
-      successfulContent should include(StartMarker)
+      successfulContent should include(ColumnAccessorMarkerConfig.startMarker)
       successfulContent should include(s"sealed class C_${successfulSpec.id.name}(prefix: String) extends ColumnWithNameAccessor")
 
       val stillBrokenContent = readScalaFile(baseDir, brokenSpec)
@@ -160,9 +161,9 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
        |  val keepMe = 1
        |}
        |
-       |${StartMarker}
+       |${ColumnAccessorMarkerConfig.startMarker}
        |$generatedContent
-       |${EndMarker}
+       |${ColumnAccessorMarkerConfig.endMarker}
        |""".stripMargin
   }
 
@@ -176,11 +177,11 @@ class ColumnWithNameAccessorTest extends AnyFlatSpec with Matchers {
        |  val keepMe = 1
        |}
        |
-       |${StartMarker}
+       |${ColumnAccessorMarkerConfig.startMarker}
        |broken generated content A
-       |${StartMarker}
+       |${ColumnAccessorMarkerConfig.startMarker}
        |broken generated content B
-       |${EndMarker}
+       |${ColumnAccessorMarkerConfig.endMarker}
        |""".stripMargin
   }
 

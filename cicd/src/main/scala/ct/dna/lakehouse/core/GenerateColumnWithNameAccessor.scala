@@ -13,6 +13,7 @@ import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.internal.findAllObjectsOfType
 import ct.dna.lakehouse.core.modelbuilder.ColumnWithNameAccessorEmbeddedAstBuilder
 import ct.dna.lakehouse.core.modelbuilder.GeneratedBlockPatcher
+import ct.dna.lakehouse.srGenerator
 import ct.dna.utils.LoggingTrait
 import ct.dna.utils.runtime.Configuration
 
@@ -45,10 +46,7 @@ object GenerateColumnWithNameAccessor extends LoggingTrait {
 
     logger.info(s"Found ${allTableSpecs.size} TableSpec object(s)")
 
-    val markerConfig = GeneratedBlockPatcher.MarkerConfig(
-      startMarker = "// AUTO GENERATED:START",
-      endMarker = "// AUTO GENERATED:END"
-    )
+    val markerConfig = srGenerator.ColumnAccessorMarkerConfig
 
     var changedCount = 0
     var unchangedCount = 0

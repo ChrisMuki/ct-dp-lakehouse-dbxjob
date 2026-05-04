@@ -13,6 +13,7 @@ target/*
 build-plugin/target/*
 cicd/target/*
 lakehouse/target/*
+sr-generator/target/*
 sbt-launch.jar
 
 # ignore local test-config resources
