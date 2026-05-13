@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate MaktTest.xlsx for ct.dna.lakehouse.dm_md.fin_hawk.MaktTest.
 
-Run via:  python3 dp-lakehouse-dbxjob/lakehouse/src/test/scripts/generate_makt_test_xlsx.py
+Run via:  python3 lakehouse/src/test/scripts/ct/dna/lakehouse/dm_md/fin_hawk/generate_makt_test_xlsx.py
 
 ------------------------------------------------------------------------------
 Test design — full cross-product of per-language transition cases.
@@ -44,8 +44,11 @@ The fixture is consumed three ways:
 E32 and EPP source rows are byte-identical except for the `_mk_system` column.
 `_mk_org = "CT"` and `_mk_site = "GBL"` everywhere.
 
-`_lh_ingest_warning` carries a per-row label of the form "D=cN;E=cM" so that
-diffs immediately point at the failing transition combination.
+The source sheets carry two extra columns `#D_case` and `#E_case` that spell
+out the per-language transition in plain English. Columns whose header starts
+with `#` are ignored by `TestDataManager` on read (see
+`_5_lakehouseCore/.../TestDataManager.scala` ~ line 80), so they exist purely
+for humans inspecting the workbook.
 
 NULL vs empty-string contract (matters for the Excel cells):
 
@@ -62,20 +65,44 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-OUT = (
-    Path(__file__).resolve().parents[1]
-    / "resources" / "ct" / "dna" / "lakehouse" / "dm_md" / "fin_hawk" / "MaktTest.xlsx"
-)
+def _resource_sibling(filename: str) -> Path:
+    """Mirror `…/test/scripts/<pkg>/this.py` to `…/test/resources/<pkg>/<filename>`."""
+    here = Path(__file__).resolve()
+    scripts_root = next(p for p in here.parents if p.name == "scripts" and p.parent.name == "test")
+    pkg = here.parent.relative_to(scripts_root)
+    return scripts_root.parent / "resources" / pkg / filename
+
+
+OUT = _resource_sibling("MaktTest.xlsx")
 
 # ---------------------------------------------------------------------------
 # Source schema: ct.dna.lakehouse.sr.ct_gbl_*.E_makt (entity column order).
 # ---------------------------------------------------------------------------
 SRC_HEADER = [
+    "#D_case", "#E_case",
     "mandt", "matnr", "spras", "maktx", "maktg",
     "_mk_org", "_mk_site", "_mk_system", "_mk_instance", "_mk_partition",
     "_mk_file", "_mk_container", "_mk_account", "_mk_created_at",
     "_lh_id_in_message", "_lh_ingest_warning",
 ]
+
+# Human-readable descriptions of every per-language transition. Written into
+# the `#D_case` / `#E_case` comment columns of the source sheets. The `#`
+# prefix tells TestDataManager to ignore them on read.
+CASE_DESCRIPTIONS = {
+    1:  "value -> other value",
+    2:  "value -> NULL",
+    3:  "value -> same value (other column changed)",
+    4:  "row bit-identical (no event)",
+    5:  "value -> row deleted",
+    6:  "NULL -> value",
+    7:  "NULL -> NULL (other column changed)",
+    8:  "NULL -> row bit-identical (no event)",
+    9:  "NULL -> row deleted",
+    10: "no row -> value",
+    11: "no row -> no row",
+    12: "no row -> NULL",
+}
 
 TGT_HEADER = ["_mk_system", "_mk_instance", "matnr", "spras", "maktx", "_maktx_d", "_maktx_e"]
 
@@ -157,10 +184,14 @@ def _ts_value(case_id, snapshot):
     return TS_PRE if snapshot == "pre" else TS_POST
 
 
-def src_row(matnr, spras, system, maktx, ts, warning):
+def src_row(matnr, spras, system, maktx, ts, d_case_desc, e_case_desc):
     """Build one source-entity row with constant metadata defaults.
-    `maktx` may be None to emit an empty cell (Spark NULL)."""
+    `maktx` may be None to emit an empty cell (Spark NULL).
+    The `#D_case` / `#E_case` columns are dropped on read but help humans
+    understand the row at a glance."""
     return [
+        d_case_desc, # #D_case  (ignored on read; description of the D transition)
+        e_case_desc, # #E_case  (ignored on read; description of the E transition)
         "100",       # mandt
         matnr,       # matnr
         spras,       # spras
@@ -176,7 +207,7 @@ def src_row(matnr, spras, system, maktx, ts, warning):
         "a",         # _mk_account
         ts,          # _mk_created_at
         1,           # _lh_id_in_message
-        warning,     # _lh_ingest_warning
+        None,        # _lh_ingest_warning (left empty; see #D_case / #E_case)
     ]
 
 
@@ -189,13 +220,14 @@ def build_source_rows(system, snapshot):
             if i == 11 and j == 11:
                 continue
             matnr = matnr_for(i, j)
-            warning = f"D=c{i:02d};E=c{j:02d}"
+            d_desc = f"D c{i:02d}: {CASE_DESCRIPTIONS[i]}"
+            e_desc = f"E c{j:02d}: {CASE_DESCRIPTIONS[j]}"
             for lang, case_id in (("D", i), ("E", j)):
                 mx = _maktx_value(case_id, snapshot, lang, matnr)
                 if mx is ABSENT:
                     continue
                 rows.append(
-                    src_row(matnr, lang, system, mx, _ts_value(case_id, snapshot), warning)
+                    src_row(matnr, lang, system, mx, _ts_value(case_id, snapshot), d_desc, e_desc)
                 )
     return rows
 
