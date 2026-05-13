@@ -55,8 +55,6 @@ class MaktTest extends TestForTable(makt) {
 
   lazy val tdm = TestDataManager("makt", "MaktTest.xlsx", ResourceLoader.withClass(makt.getClass))
 
-  behavior of "makt"
-
   lazy val spark: SparkSession = SparkSession.active
 
   // Resolve the workbook relative to this test class's package, i.e.
@@ -77,6 +75,11 @@ class MaktTest extends TestForTable(makt) {
     makt.sourceTableSpecs.foreach(tdm.dropSourceIfExists)
   } finally super.afterAll()
 
+  behavior of "makt"
+
+  it should "validateToRoot" in {
+    makt.validateToRoot()
+  }
   // ---------------------------------------------------------------------------
   // Phase 0 — empty everywhere.
   // ---------------------------------------------------------------------------
