@@ -64,6 +64,62 @@ from datetime import datetime
 from pathlib import Path
 
 from openpyxl import Workbook
+from openpyxl.formatting.rule import FormulaRule
+from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
+
+# ---------------------------------------------------------------------------
+# Monkey-patch openpyxl: by default its cell writer skips empty-string cells
+# entirely (`value == ""` short-circuits to a bare <c/>), which Excel and POI
+# both interpret as a truly blank cell — indistinguishable from None. We want
+# empty strings to survive the round trip so the test contract
+# "NULL ≠ \"\"" stays observable. The patched writer emits a real
+# <is><t></t></is> element when data_type=='s'.
+# ---------------------------------------------------------------------------
+from openpyxl import LXML  # noqa: E402
+from openpyxl.cell import _writer as _cell_writer  # noqa: E402
+from openpyxl.xml.functions import Element, SubElement, XML_NS  # noqa: E402
+
+
+def _patched_etree_write_cell(xf, worksheet, cell, styled=None):
+    value, attributes = _cell_writer._set_attributes(cell, styled)
+    el = Element("c", attributes)
+    if cell.data_type == "s":
+        is_el = SubElement(el, "is")
+        t_el = SubElement(is_el, "t")
+        if value:
+            t_el.text = value
+        if value is not None and value != value.strip():
+            t_el.set("{%s}space" % XML_NS, "preserve")
+        xf.write(el)
+        return
+    # Fall back to the original implementation for everything non-string.
+    _cell_writer._ORIGINAL_etree_write_cell(xf, worksheet, cell, styled)
+
+
+def _patched_lxml_write_cell(xf, worksheet, cell, styled=False):
+    value, attributes = _cell_writer._set_attributes(cell, styled)
+    if cell.data_type == "s":
+        with xf.element("c", attributes):
+            with xf.element("is"):
+                attrs = {}
+                if value is not None and value != value.strip():
+                    attrs["{%s}space" % XML_NS] = "preserve"
+                el = Element("t", attrs)
+                el.text = value or ""
+                xf.write(el)
+        return
+    _cell_writer._ORIGINAL_lxml_write_cell(xf, worksheet, cell, styled)
+
+
+_cell_writer._ORIGINAL_etree_write_cell = _cell_writer.etree_write_cell
+_cell_writer._ORIGINAL_lxml_write_cell = _cell_writer.lxml_write_cell
+_cell_writer.etree_write_cell = _patched_etree_write_cell
+_cell_writer.lxml_write_cell = _patched_lxml_write_cell
+_cell_writer.write_cell = _patched_lxml_write_cell if LXML else _patched_etree_write_cell
+# Also patch the import used by worksheet/_writer (it captured the symbol at import time).
+import openpyxl.worksheet._writer as _ws_writer  # noqa: E402
+_ws_writer.write_cell = _cell_writer.write_cell
 
 def _resource_sibling(filename: str) -> Path:
     """Mirror `…/test/scripts/<pkg>/this.py` to `…/test/resources/<pkg>/<filename>`."""
@@ -375,12 +431,46 @@ def state_to_rows(state_per_system):
 wb = Workbook()
 del wb["Sheet"]
 
+# Light yellow used to highlight empty-string cells ("") so they stand out
+# from real NULL cells (which stay default-empty).
+EMPTY_STRING_FILL = PatternFill(start_color="FFFACD", end_color="FFFACD", fill_type="solid")
+
 
 def add_sheet(name, header, rows):
+    """Write one sheet.
+
+    Empty strings ("") are stored as inline string cells with the Excel
+    quote-prefix flag — exactly what you'd get by typing `'` followed by
+    Enter in Excel itself. POI (and therefore TestDataManager) reads them
+    back as STRING with value "", which is the contract we need.
+
+    A sheet-local conditional-formatting rule then highlights every
+    non-blank empty cell in the data area in light yellow, so a human
+    inspector can immediately tell apart NULL (truly empty) from "".
+    """
     ws = wb.create_sheet(name)
     ws.append(header)
     for r in rows:
         ws.append(r)
+        excel_row_idx = ws.max_row
+        for col_idx, value in enumerate(r, start=1):
+            if value == "":
+                cell = ws.cell(row=excel_row_idx, column=col_idx)
+                cell.value = ""
+                cell.data_type = "s"
+                cell.quotePrefix = True
+
+    if rows:
+        last_col = get_column_letter(len(header))
+        last_row = ws.max_row
+        data_range = f"A2:{last_col}{last_row}"
+        # `A1=""` would also match BLANK cells in Excel; LEN+ISBLANK
+        # narrows it to actual empty strings only.
+        rule = FormulaRule(
+            formula=[f'AND(NOT(ISBLANK(A2)), LEN(A2)=0)'],
+            fill=EMPTY_STRING_FILL,
+        )
+        ws.conditional_formatting.add(data_range, rule)
 
 
 # ---- Source sheets — identical between E32 and EPP except _mk_system. ----
