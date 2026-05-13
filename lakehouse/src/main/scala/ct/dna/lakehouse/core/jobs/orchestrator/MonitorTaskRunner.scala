@@ -31,7 +31,6 @@ private[orchestrator] object MonitorTaskRunner extends LoggingTrait {
 
   def run(task: OrchestratorTask.Monitor): Unit = {
     PrintlnAppender.replaceConsoleAppendersWithPrintlnAppenders()
-    WorkerTaskRunner.raiseCtDnaLoggersToWarn()
 
     val parsed =
       Configuration

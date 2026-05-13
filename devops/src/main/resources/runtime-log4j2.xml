@@ -210,9 +210,6 @@
       <AppenderRef ref="publicFile.rolling.rewrite" />
       <AppenderRef ref="console.info" />
     </Logger>
-    <!-- Worker console quieting is enforced programmatically in WorkerTaskRunner.raiseCtDnaLoggersToWarn (PrintlnAppender
-         bypasses appender-level filters, so this Logger override is mostly defensive). Keep WARN here so even if the
-         programmatic override is bypassed, INFO-level chatter from this class still gets filtered. -->
     <Logger name="ct.dna.lakehouse.core.jobs.orchestrator.WorkerTaskRunner" level="WARN" additivity="false">
       <AppenderRef ref="publicFile.rolling.rewrite" />
       <AppenderRef ref="console.warn" />

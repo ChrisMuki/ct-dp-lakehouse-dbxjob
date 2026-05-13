@@ -33,12 +33,6 @@ private[orchestrator] object WorkerTaskRunner extends LoggingTrait {
     // Databricks task **Output** tab (in addition to the driver log file). Mirrors dp-pipeline-dbxjob's DBXLoadWorker.
     PrintlnAppender.replaceConsoleAppendersWithPrintlnAppenders()
 
-    // `PrintlnAppender` bypasses appender-level filters, so the `ThresholdFilter level="WARN"` on `console.warn`
-    // is ignored after the replacement above. Raise the logger level for every `ct.dna.*` logger to WARN to drop
-    // INFO chatter at the logger level (which is checked before appenders). Worker JVM only — does not affect
-    // Summary / JobSetup tasks which run in their own JVMs.
-    raiseCtDnaLoggersToWarn()
-
     val parsed = Configuration
       .required("rootDir")
       .required("orchestratorConfig")

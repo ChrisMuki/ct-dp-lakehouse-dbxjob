@@ -116,7 +116,7 @@ case class AssetDirectory(
         policyId = cc.clusterPolicyId.orNull,
         workloadType = WorkloadType(clients = WorkloadTypeClients(notebooks = false, jobs = true)),
         dataSecurityMode = "SINGLE_USER",
-        runtimeEngine = "STANDARD",
+        runtimeEngine = "PHOTON",
         kind = "CLASSIC_PREVIEW",
         isSingleNode = false,
         autoscale = Autoscale(minWorkers = 1, maxWorkers = cc.maxWorkerNodes)
