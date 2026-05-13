@@ -63,8 +63,17 @@ private[orchestrator] object WorkerTaskRunner extends LoggingTrait {
       while (shouldKeepPolling(task)) {
         CatalogOrchestrator.queue.pollOne() match {
           case None =>
-            if (CatalogOrchestrator.enqueueComplete.get() && CatalogOrchestrator.queue.size == 0) {
-              // Queue is fully drained and Setup has finished enqueuing — we're done.
+            // We may exit as soon as Setup is done enqueuing AND nothing remains pending (Neutral or Blocked) —
+            // even if other workers are still grinding on long-tail tables. With pendingCount==0 there is no
+            // Blocked item that a Running completion could ever release, so this idle worker will never get more
+            // work. This avoids 11 workers spin-polling for hours while the 12th finishes a slow table.
+            if (CatalogOrchestrator.enqueueComplete.get() && CatalogOrchestrator.queue.pendingCount == 0) {
+              val stillRunning = CatalogOrchestrator.queue.runningCount
+              if (stillRunning > 0) {
+                logger.warn(
+                  s"Worker '${task.name}' exiting early — queue drained (no pending items); $stillRunning table(s) still running on other workers."
+                )
+              }
               return
             }
             Try(Thread.sleep(idleSleepMs))
@@ -146,7 +155,7 @@ private[orchestrator] object WorkerTaskRunner extends LoggingTrait {
     )
     // Publish the live "this worker is busy with this table" view (kept for in-JVM consumers; cross-task observers use HeartbeatStore).
     CatalogOrchestrator.runningTables.put(workerKey, (tableId, java.lang.Long.valueOf(t0)))
-    val heartbeat = startHeartbeat(thread, tableId.toString, t0, heartbeatIntervalMs)
+    val heartbeat = startHeartbeat(thread, cfg, runId, workerKey, tableLabel, t0, heartbeatIntervalMs, counters)
     val (outcomeLabel, status, errOpt): (String, String, Option[Throwable]) =
       try {
         Try(TableUpdaterCore.update(packageName, tableName)) match {
@@ -221,13 +230,31 @@ private[orchestrator] object WorkerTaskRunner extends LoggingTrait {
   /** Background daemon that emits `IN-PROGRESS $tableId durationMs=…` every `intervalMs` while a worker is updating a table. Returned thread should be
     * `interrupt()`ed when the update completes (the heartbeat treats `InterruptedException` as a clean stop signal).
     */
-  private def startHeartbeat(thread: String, tableLabel: String, startMs: Long, intervalMs: Long): Thread = {
+  private def startHeartbeat(
+      thread: String,
+      cfg: OrchestratorConfig,
+      runId: String,
+      workerName: String,
+      tableLabel: String,
+      startMs: Long,
+      intervalMs: Long,
+      counters: WorkerCounters
+  ): Thread = {
     val t = new Thread(
       () => {
         try {
           while (!Thread.currentThread().isInterrupted) {
             Thread.sleep(intervalMs)
             val elapsedMs = System.currentTimeMillis() - startMs
+            publishStatus(
+              cfg,
+              runId,
+              workerName,
+              HeartbeatStore.State_Running,
+              currentTable = Some(tableLabel),
+              currentStartedAtMs = Some(startMs),
+              counters
+            )
             logger.warn(s"[$thread] IN-PROGRESS $tableLabel durationMs=$elapsedMs")
           }
         } catch { case _: InterruptedException => () }
