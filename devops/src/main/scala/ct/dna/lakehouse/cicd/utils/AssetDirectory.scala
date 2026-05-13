@@ -106,7 +106,7 @@ case class AssetDirectory(
         ),
         // `NewCluster.sparkConf` is a typed field on the upstream case class; merge the hard-coded `aggressiveWindowDownS`
         // tweak with the per-stage overrides from `clusterConfiguration.sparkConf` (stage config wins on key collisions).
-        sparkConf = Map("spark.databricks.aggressiveWindowDownS" -> "300") ++ cc.sparkConf,
+        sparkConf = cc.sparkConf,
         sparkEnvVars = null,
         initScripts = List(
           JobInitScript(

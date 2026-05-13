@@ -10,7 +10,14 @@
       "clusterPolicyId": "000AC9F2923A51E1",
       "maxWorkerNodes": 8,
       "nodeTypeId": "Standard_D4ds_v5",
-      "driverNodeTypeId": "Standard_D4ds_v5"
+      "driverNodeTypeId": "Standard_D4ds_v5",
+      "sparkConf": {
+        "spark.databricks.aggressiveWindowDownS": "300",
+        "spark.sql.shuffle.partitions": "2048",
+        "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
+        "spark.sql.autoBroadcastJoinThreshold": "104857600",
+        "spark.sql.adaptive.autoBroadcastJoinThreshold": "104857600"
+      }
     },
     "permissions": [
       {

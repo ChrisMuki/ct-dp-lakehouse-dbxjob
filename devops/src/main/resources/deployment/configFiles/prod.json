@@ -9,8 +9,15 @@
       "sparkVersion": "17.3.x-scala2.13",
       "clusterPolicyId": "0009D8E7AF32CDAF",
       "maxWorkerNodes": 8,
-      "nodeTypeId": "Standard_D8ds_v5",
-      "driverNodeTypeId": "Standard_D4ds_v5"
+      "nodeTypeId": "Standard_E8ds_v5",
+      "driverNodeTypeId": "Standard_D4ds_v5",
+      "sparkConf": {
+        "spark.databricks.aggressiveWindowDownS": "300",
+        "spark.sql.shuffle.partitions": "2048",
+        "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
+        "spark.sql.autoBroadcastJoinThreshold": "104857600",
+        "spark.sql.adaptive.autoBroadcastJoinThreshold": "104857600"
+      }
     },
     "permissions": [
       {
