@@ -1,5 +1,6 @@
 package ct.dna.lakehouse.core.jobs
 
+import ct.dna.utils.ExecuteOnce
 import ct.dna.utils.runtime.Task
 import ct.dna.utils.runtime.TaskEntryPoint
 
@@ -18,7 +19,7 @@ object TableUpdaterEntryPoint extends TaskEntryPoint {
     )
   }
 
-  override def shutdownHook: Unit = {
+  protected val cleanUpDuringShutdown: ExecuteOnce[Unit] = ExecuteOnce {
     logger.info("TableUpdaterEntryPoint shutdown hook triggered")
   }
 }

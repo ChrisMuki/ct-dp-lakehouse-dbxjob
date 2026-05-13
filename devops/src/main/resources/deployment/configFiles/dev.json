@@ -1,0 +1,46 @@
+{
+  "deploymentConfig": {
+    "host": "https://adb-7405616666691350.10.azuredatabricks.net",
+    "volumeCatalog": "dev_lakehouse",
+    "volumeSchema": "uih70837",
+    "targetMode": "development",
+    "deploymentAzAuth": "AzureCli",
+    "clusterConfiguration": {
+      "sparkVersion": "17.3.x-scala2.13",
+      "clusterPolicyId": "000AC9F2923A51E1",
+      "maxWorkerNodes": 8,
+      "nodeTypeId": "Standard_D4ds_v5",
+      "driverNodeTypeId": "Standard_D4ds_v5"
+    },
+    "permissions": [
+      {
+        "groupName": "au00_1043_EDAP_dev_DevOps",
+        "level": "CAN_RUN"
+      }
+    ],
+    "schedules": {
+      "sr": {
+        "quartzCronExpression": "0 0 2 * * ?",
+        "timezoneId": "UTC",
+        "pauseStatus": "PAUSED"
+      },
+      "dm_md": {
+        "quartzCronExpression": "0 0 4 * * ?",
+        "timezoneId": "UTC",
+        "pauseStatus": "PAUSED"
+      }
+    },
+    "continuous": {},
+    "workerCountDefault": 4,
+    "workerCounts": {
+      "sr": 8,
+      "dm_md": 2
+    },
+    "orchestrator": {
+      "idleSleepSeconds": 5,
+      "statusIntervalSeconds": 60,
+      "maxRuntimeSeconds": 7200,
+      "drainTimeoutSeconds": 600
+    }
+  }
+}

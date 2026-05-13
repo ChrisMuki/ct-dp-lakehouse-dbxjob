@@ -3,23 +3,24 @@ package ct.dna.lakehouse.dm_md.fin_hawk
 import ct.dna.lakehouse.core.framework.ChangeFeed
 import ct.dna.lakehouse.core.framework.Result
 import ct.dna.lakehouse.core.framework.Table
+import ct.dna.lakehouse.core.model.ColumnWithName
 import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.Entity.PK
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.Updated
-import ct.dna.lakehouse.sr.ct_gbl_e32.{t001k => t001k_e32}
-import ct.dna.lakehouse.sr.ct_gbl_epp.{t001k => t001k_epp}
-import ct.dna.lakehouse.sr.ct_gbl_ghp.{t001k => t001k_ghp}
-import ct.dna.lakehouse.sr.ct_gbl_p12.{t001k => t001k_p12}
-import ct.dna.lakehouse.sr.ct_gbl_p24.{t001k => t001k_p24}
-import ct.dna.lakehouse.sr.ct_gbl_p43.{t001k => t001k_p43}
-import ct.dna.lakehouse.sr.ct_gbl_p61.{t001k => t001k_p61}
-import ct.dna.lakehouse.sr.ct_gbl_p64.{t001k => t001k_p64}
-import ct.dna.lakehouse.sr.ct_gbl_p73.{t001k => t001k_p73}
-import ct.dna.lakehouse.sr.ct_gbl_p77.{t001k => t001k_p77}
-import ct.dna.lakehouse.sr.ct_gbl_p85.{t001k => t001k_p85}
-import ct.dna.lakehouse.sr.ct_gbl_pbr.{t001k => t001k_pbr}
-import ct.dna.lakehouse.sr.ct_gbl_psp.{t001k => t001k_psp}
+import ct.dna.lakehouse.sr.ct_gbl_e32
+import ct.dna.lakehouse.sr.ct_gbl_epp
+import ct.dna.lakehouse.sr.ct_gbl_ghp
+import ct.dna.lakehouse.sr.ct_gbl_p12
+import ct.dna.lakehouse.sr.ct_gbl_p24
+import ct.dna.lakehouse.sr.ct_gbl_p43
+import ct.dna.lakehouse.sr.ct_gbl_p61
+import ct.dna.lakehouse.sr.ct_gbl_p64
+import ct.dna.lakehouse.sr.ct_gbl_p73
+import ct.dna.lakehouse.sr.ct_gbl_p77
+import ct.dna.lakehouse.sr.ct_gbl_p85
+import ct.dna.lakehouse.sr.ct_gbl_pbr
+import ct.dna.lakehouse.sr.ct_gbl_psp
 import org.apache.spark.sql.functions._
 
 case class DmT001K(
@@ -33,60 +34,129 @@ object t001k extends TableSpec[DmT001K] with Updated.ByOneTransaction {
 
   override def sourceTableSpecs: Seq[TableSpec[Entity]] =
     Seq(
-      t001k_e32,
-      t001k_epp,
-      t001k_ghp,
-      t001k_p12,
-      t001k_p24,
-      t001k_p43,
-      t001k_p61,
-      t001k_p64,
-      t001k_p73,
-      t001k_p77,
-      t001k_p85,
-      t001k_pbr,
-      t001k_psp
+      ct_gbl_e32.t001k,
+      ct_gbl_epp.t001k,
+      ct_gbl_ghp.t001k,
+      ct_gbl_p12.t001k,
+      ct_gbl_p24.t001k,
+      ct_gbl_p43.t001k,
+      ct_gbl_p61.t001k,
+      ct_gbl_p64.t001k,
+      ct_gbl_p73.t001k,
+      ct_gbl_p77.t001k,
+      ct_gbl_p85.t001k,
+      ct_gbl_pbr.t001k,
+      ct_gbl_psp.t001k
     )
+
+  private def projectChanges(lastOfKey: org.apache.spark.sql.DataFrame): org.apache.spark.sql.DataFrame =
+    lastOfKey
+      .filter(col("bwkey").isNotNull)
+      .select(
+        col("_mk_system"),
+        col("_mk_instance"),
+        col("bwkey"),
+        col("bukrs"),
+        col("_change_type")
+      )
 
   override def executeTransaction(
       table: Table,
       changeFeeds: Map[TableSpec[Entity], ChangeFeed]
   ): Result = {
 
-    val sources = Seq(
-      t001k_e32,
-      t001k_epp,
-      t001k_ghp,
-      t001k_p12,
-      t001k_p24,
-      t001k_p43,
-      t001k_p61,
-      t001k_p64,
-      t001k_p73,
-      t001k_p77,
-      t001k_p85,
-      t001k_pbr,
-      t001k_psp
-    )
+    val feeds = sourceTableSpecs.map(s => s -> changeFeeds(s))
 
-    val result = sources
-      .map(tableSpec =>
-        changeFeeds(tableSpec)
-          .toDF()
-          .select("_mk_system", "_mk_instance", "bwkey", "bukrs")
-      )
+    if (feeds.forall { case (_, f) => f.isUnchanged }) return Result.NoChanges
+
+    val snapshotSystems: Set[String] = feeds
+      .collect {
+        case (_, feed) if feed.isSnapshot =>
+          feed.toDF().select(C_t001k._mk_system).limit(1).collect().map(_.getString(0)).toSet
+      }
+      .flatten
+      .toSet
+
+    val grouped = feeds
+      .map { case (_, feed) => projectChanges(feed.lastOfKey()) }
       .reduce(_.unionByName(_))
-      .filter(col("bwkey").isNotNull)
-      .distinct()
+
+    val target = C_t001k.withDFAlias("target")
+
+    val source = new {
+      val _mk_system = ColumnWithName("_mk_system").withDFAlias("source")
+      val _mk_instance = ColumnWithName("_mk_instance").withDFAlias("source")
+      val bwkey = ColumnWithName("bwkey").withDFAlias("source")
+      val bukrs = ColumnWithName("bukrs").withDFAlias("source")
+      val _change_type = ColumnWithName("_change_type").withDFAlias("source")
+    }
+
+    val isDelete = source._change_type === "delete"
+    // Framework emits `_change_type` ∈ {`insert`, `update`, `delete`}; anything not a delete is an upsert.
+    val isUpsert = source._change_type =!= "delete"
 
     table
-      .merge(result, lit(false))
-      .whenNotMatched()
-      .insertAll()
-      .whenNotMatchedBySource()
+      .merge(
+        grouped,
+        source._mk_system === target._mk_system &&
+          source._mk_instance === target._mk_instance &&
+          source.bwkey === target.bwkey
+      )
+      .whenMatched(isDelete)
+      .delete()
+      .whenMatched()
+      .update(
+        C_t001k.bukrs -> source.bukrs
+      )
+      .whenNotMatched(isUpsert)
+      .insert(
+        C_t001k._mk_system -> source._mk_system,
+        C_t001k._mk_instance -> source._mk_instance,
+        C_t001k.bwkey -> source.bwkey,
+        C_t001k.bukrs -> source.bukrs
+      )
+      .whenNotMatchedBySource(target._mk_system.isin(snapshotSystems.toSeq: _*))
       .delete()
       .execute()
+  }
 
-    Result.Merged
+  override def validate(): Unit = {
+    super.validate()
+
+    val canonicalKeys = ct_gbl_e32.t001k.keyColumnNames.toSet
+    val canonicalValuesRequired = Set("bukrs")
+
+    sourceTableSpecs.foreach { spec =>
+      require(
+        spec.keyColumnNames.toSet == canonicalKeys,
+        s"Source table '$spec' has key columns ${spec.keyColumnNames} but expected ${ct_gbl_e32.t001k.keyColumnNames}"
+      )
+      val missingValues = canonicalValuesRequired -- spec.valueColumnNames.toSet
+      require(
+        missingValues.isEmpty,
+        s"Source table '$spec' is missing value columns required by transformation: ${missingValues.mkString(", ")}"
+      )
+    }
   }
 }
+
+// COLUMN ACCESSOR AUTO GENERATED:START
+// Generated by ColumnWithNameAccessorEmbeddedAstBuilder - DO NOT EDIT MANUALLY
+import ct.dna.lakehouse.core.model.ColumnWithName
+import ct.dna.lakehouse.core.model.ColumnWithNameAccessor
+
+sealed class C_t001k(prefix: String) extends ColumnWithNameAccessor {
+  val _mk_system: ColumnWithName = ColumnWithName(prefix, "_mk_system")
+  val _mk_instance: ColumnWithName = ColumnWithName(prefix, "_mk_instance")
+  val bwkey: ColumnWithName = ColumnWithName(prefix, "bwkey")
+  val bukrs: ColumnWithName = ColumnWithName(prefix, "bukrs")
+}
+
+object C_t001k extends C_t001k("") {
+  def withDFAlias(alias: String): C_t001k = new C_t001k(alias)
+  def withoutDFAlias: C_t001k = this
+
+  @deprecated("Use withDFAlias instead.", "")
+  def as(alias: String): C_t001k = withDFAlias(alias)
+}
+// COLUMN ACCESSOR AUTO GENERATED:END

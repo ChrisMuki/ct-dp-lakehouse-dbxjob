@@ -1,0 +1,20 @@
+{
+    "projects": [
+        {
+            "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/",
+            "basePackage": "ct/dna/lakehouse/dm_md"
+        },
+         {
+            "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/",
+            "basePackage": "ct/dna/lakehouse/dm_tx"
+        },
+        {
+            "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/",
+            "basePackage": "ct/dna/lakehouse/dw_md"
+        },
+        {
+            "baseDir": "/workspaces/dp-lakehouse-dbxjob/lakehouse/src/main/scala/",
+            "basePackage": "ct/dna/lakehouse/dw_tx"
+        }
+    ]
+}

@@ -10,11 +10,8 @@ project/project**
 project/target**
 project/metals.sbt
 target/*
-build-plugin/target/*
-cicd/target/*
-lakehouse/target/*
-sr-generator/target/*
-sbt-launch.jar
+
+*/target/*
 
 # ignore local test-config resources
 */src/test/resources/test-config.json
@@ -34,11 +31,3 @@ cicd/src/main/resources/deployment/configFiles/*.json
 
 
 config/config.json
-run-fin-hawk-sr.sh
-run-fin-hawk-dm.sh
-schema_config.json
-src_schemas.sh
-result_columns.json
-DWTxYAMLGenerator.scala
-**/DWTxYAMLGenerator.scala
-**/DwTxYamlGenerator.scala

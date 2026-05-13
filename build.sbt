@@ -1,6 +1,12 @@
 import sbt._
 import Keys._
 
+// Shortcut task: runs the GenerateColumnWithNameAccessor main in the `devops`
+// project. Invoke as `generateColumns` (or `devops/generateColumns`).
+lazy val generateColumns = taskKey[Unit](
+  "Run ct.dna.lakehouse.core.GenerateColumnWithNameAccessor in the devops project"
+)
+
 inThisBuild(
   Seq(
     // Scope: applies to forked run/test JVMs, not the sbt launcher process.
@@ -22,23 +28,8 @@ inThisBuild(
   )
 )
 
-val dnaBomVersion = "2.3.0"
-
-lazy val srGenerator = project
-  .in(file("sr-generator"))
-  .enablePlugins(JavaAppPackaging)
-  .settings(
-    name := "sr-generator",
-    run / fork := true,
-    assembly / skip := true,
-    useDnaBom(dnaBomVersion)(
-      "lakehouse-modelbuilder",
-      "local-spark-runtime"
-    ),
-    libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % "3.2.19" % Test
-    )
-  )
+val dnaBomVersion = "2.8.1"
+val lakehouseSrVersion = "0.2.0"
 
 lazy val lakehouse = project
   .in(file("lakehouse"))
@@ -56,19 +47,19 @@ lazy val lakehouse = project
       // Test only
       "local-spark-runtime" % Test
     ),
+    Test / unmanagedResourceDirectories += (ThisBuild / baseDirectory).value / "config",
     libraryDependencies ++= Seq(
+      "ct.dna" %% "lakehouse-sr" % lakehouseSrVersion,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     )
   )
 
-// will be renamed to devops later: this will contain the code to all ColumnWithNameAccessors and also the related scala files (deployment, ...)
-lazy val cicd = project
-  .in(file("cicd"))
-  .dependsOn(srGenerator)
+lazy val devops = project
+  .in(file("devops"))
   .dependsOn(lakehouse)
   .enablePlugins(JavaAppPackaging)
   .settings(
-    name := "cicd",
+    name := "devops",
     run / fork := true,
     assembly / skip := true,
     useDnaBom(dnaBomVersion)(
@@ -78,7 +69,10 @@ lazy val cicd = project
     ),
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
-    )
+    ),
+    generateColumns := (Compile / runMain)
+      .toTask(" ct.dna.lakehouse.core.GenerateColumnWithNameAccessor")
+      .value
   )
 
 // almond: notebook playground subproject. Hosts custom Scala helpers and Jupyter
@@ -89,7 +83,7 @@ lazy val cicd = project
 // want notebooks to import code from another subproject.
 lazy val almond = project
   .in(file("almond"))
-  // .dependsOn(srGenerator)
+  .dependsOn(lakehouse)
   .settings(
     name := "almond",
     run / fork := true,
@@ -132,12 +126,12 @@ lazy val almond = project
 lazy val root = project
   .in(file("."))
   .aggregate(
-    srGenerator,
     lakehouse,
-    cicd,
+    devops,
     almond
   )
   .settings(
     assembly / skip := true,
-    name := "multi-project-root"
+    name := "multi-project-root",
+    generateColumns := (devops / generateColumns).value
   )

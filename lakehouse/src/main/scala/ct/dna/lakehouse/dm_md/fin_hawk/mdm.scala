@@ -59,69 +59,132 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
       changeFeeds: Map[TableSpec[Entity], ChangeFeed]
   ): Result = {
 
+    val feeds = sourceTableSpecs.map(s => s -> changeFeeds(s))
+
+    // Nothing changed in any source → skip the run entirely.
+    if (feeds.forall { case (_, f) => f.isUnchanged }) return Result.NoChanges
+
+    val mara_s = C_mara.withDFAlias("mara")
+    val makt_s = C_makt.withDFAlias("makt")
+    val t023t_s = C_t023t.withDFAlias("t023t")
+
+    // Both makt and t023t are small descriptive dimensions relative to mara
+    // (one row per language per key, only D/E retained after upstream pivot).
+    // Broadcasting them turns this into two map-side joins on a single mara
+    // shuffle, which is cheaper than a sort-merge join when mara is wide.
     val maraDf = changeFeeds(dm_mara).toDF().alias("mara")
-    val maktDf = changeFeeds(dm_makt).toDF().alias("makt")
-    val t023tDf = changeFeeds(dm_t023t).toDF().alias("t023t")
+    val maktDf = broadcast(changeFeeds(dm_makt).toDF()).alias("makt")
+    val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
 
     val joined = maraDf
       .join(
         maktDf,
-        col("mara._mk_instance") === col("makt._mk_instance") &&
-          col("mara._mk_system") === col("makt._mk_system") &&
-          col("mara.matnr") === col("makt.matnr"),
+        mara_s._mk_instance === makt_s._mk_instance &&
+          mara_s._mk_system === makt_s._mk_system &&
+          mara_s.matnr === makt_s.matnr,
         "left"
       )
       .join(
         t023tDf,
-        col("mara._mk_instance") === col("t023t._mk_instance") &&
-          col("mara._mk_system") === col("t023t._mk_system") &&
-          col("mara.matkl") === col("t023t.matkl"),
+        mara_s._mk_instance === t023t_s._mk_instance &&
+          mara_s._mk_system === t023t_s._mk_system &&
+          mara_s.matkl === t023t_s.matkl,
         "left"
       )
       .select(
-        col("mara._mk_system").as("_mk_system"),
-        col("mara._mk_instance").as("_mk_instance"),
-        concat(col("mara._mk_system"), col("mara._mk_instance"), lit("_"), col("mara.matnr")).as("key_column"),
-        col("mara.matnr").as("matnr"),
-        col("mara.mtart").as("mtart"),
-        col("mara.matkl").as("matkl"),
-        col("mara.ersda").as("ersda"),
-        col("mara.pstat").as("pstat"),
-        col("mara.vpsta").as("vpsta"),
-        col("mara.lvorm").as("lvorm"),
-        col("mara.meins").as("meins"),
-        col("mara.ferth").as("ferth"),
-        col("mara.formt").as("formt"),
-        col("mara.groes").as("groes"),
-        col("mara.wrkst").as("wrkst"),
-        col("mara.normt").as("normt"),
-        col("mara.brgew").as("brgew"),
-        col("mara.ntgew").as("ntgew"),
-        col("mara.gewei").as("gewei"),
-        col("mara.volum").as("volum"),
-        col("mara.voleh").as("voleh"),
-        col("mara.laeng").as("laeng"),
-        col("mara.breit").as("breit"),
-        col("mara.hoehe").as("hoehe"),
-        col("mara.meabm").as("meabm"),
-        col("mara.prdha").as("prdha"),
-        col("mara.attyp").as("attyp"),
-        col("mara.mfrpn").as("mfrpn"),
-        col("mara.mfrnr").as("mfrnr"),
-        col("makt.spras").as("spras"),
-        col("makt.maktx").as("maktx"),
-        col("t023t.spras").as("spras_t023t"),
-        col("t023t.wgbez").as("wgbez")
+        mara_s._mk_system.as("_mk_system"),
+        mara_s._mk_instance.as("_mk_instance"),
+        concat(mara_s._mk_system, mara_s._mk_instance, lit("_"), mara_s.matnr).as("key_column"),
+        mara_s.matnr.as("matnr"),
+        mara_s.mtart.as("mtart"),
+        mara_s.matkl.as("matkl"),
+        mara_s.ersda.as("ersda"),
+        mara_s.pstat.as("pstat"),
+        mara_s.vpsta.as("vpsta"),
+        mara_s.lvorm.as("lvorm"),
+        mara_s.meins.as("meins"),
+        mara_s.ferth.as("ferth"),
+        mara_s.formt.as("formt"),
+        mara_s.groes.as("groes"),
+        mara_s.wrkst.as("wrkst"),
+        mara_s.normt.as("normt"),
+        mara_s.brgew.as("brgew"),
+        mara_s.ntgew.as("ntgew"),
+        mara_s.gewei.as("gewei"),
+        mara_s.volum.as("volum"),
+        mara_s.voleh.as("voleh"),
+        mara_s.laeng.as("laeng"),
+        mara_s.breit.as("breit"),
+        mara_s.hoehe.as("hoehe"),
+        mara_s.meabm.as("meabm"),
+        mara_s.prdha.as("prdha"),
+        mara_s.attyp.as("attyp"),
+        mara_s.mfrpn.as("mfrpn"),
+        mara_s.mfrnr.as("mfrnr"),
+        makt_s.spras.as("spras"),
+        makt_s.maktx.as("maktx"),
+        t023t_s.spras.as("spras_t023t"),
+        t023t_s.wgbez.as("wgbez")
       )
 
-    table
-      .merge(joined, lit(false))
-      .whenNotMatched()
-      .insertAll()
-      .whenNotMatchedBySource()
-      .delete()
-      .execute()
+    table.overwriteByKeys(joined)
+  }
 
-    Result.Merged
+  override def validate(): Unit = {
+    super.validate()
+    require(
+      sourceTableSpecs.toSet == Set(dm_mara, dm_makt, dm_t023t),
+      s"mdm sourceTableSpecs unexpected: $sourceTableSpecs"
+    )
   }
 }
+
+// COLUMN ACCESSOR AUTO GENERATED:START
+// Generated by ColumnWithNameAccessorEmbeddedAstBuilder - DO NOT EDIT MANUALLY
+import ct.dna.lakehouse.core.model.ColumnWithName
+import ct.dna.lakehouse.core.model.ColumnWithNameAccessor
+
+sealed class C_mdm(prefix: String) extends ColumnWithNameAccessor {
+  val _mk_system: ColumnWithName = ColumnWithName(prefix, "_mk_system")
+  val _mk_instance: ColumnWithName = ColumnWithName(prefix, "_mk_instance")
+  val key_column: ColumnWithName = ColumnWithName(prefix, "key_column")
+  val matnr: ColumnWithName = ColumnWithName(prefix, "matnr")
+  val mtart: ColumnWithName = ColumnWithName(prefix, "mtart")
+  val matkl: ColumnWithName = ColumnWithName(prefix, "matkl")
+  val ersda: ColumnWithName = ColumnWithName(prefix, "ersda")
+  val pstat: ColumnWithName = ColumnWithName(prefix, "pstat")
+  val vpsta: ColumnWithName = ColumnWithName(prefix, "vpsta")
+  val lvorm: ColumnWithName = ColumnWithName(prefix, "lvorm")
+  val meins: ColumnWithName = ColumnWithName(prefix, "meins")
+  val ferth: ColumnWithName = ColumnWithName(prefix, "ferth")
+  val formt: ColumnWithName = ColumnWithName(prefix, "formt")
+  val groes: ColumnWithName = ColumnWithName(prefix, "groes")
+  val wrkst: ColumnWithName = ColumnWithName(prefix, "wrkst")
+  val normt: ColumnWithName = ColumnWithName(prefix, "normt")
+  val brgew: ColumnWithName = ColumnWithName(prefix, "brgew")
+  val ntgew: ColumnWithName = ColumnWithName(prefix, "ntgew")
+  val gewei: ColumnWithName = ColumnWithName(prefix, "gewei")
+  val volum: ColumnWithName = ColumnWithName(prefix, "volum")
+  val voleh: ColumnWithName = ColumnWithName(prefix, "voleh")
+  val laeng: ColumnWithName = ColumnWithName(prefix, "laeng")
+  val breit: ColumnWithName = ColumnWithName(prefix, "breit")
+  val hoehe: ColumnWithName = ColumnWithName(prefix, "hoehe")
+  val meabm: ColumnWithName = ColumnWithName(prefix, "meabm")
+  val prdha: ColumnWithName = ColumnWithName(prefix, "prdha")
+  val attyp: ColumnWithName = ColumnWithName(prefix, "attyp")
+  val mfrpn: ColumnWithName = ColumnWithName(prefix, "mfrpn")
+  val mfrnr: ColumnWithName = ColumnWithName(prefix, "mfrnr")
+  val spras: ColumnWithName = ColumnWithName(prefix, "spras")
+  val maktx: ColumnWithName = ColumnWithName(prefix, "maktx")
+  val spras_t023t: ColumnWithName = ColumnWithName(prefix, "spras_t023t")
+  val wgbez: ColumnWithName = ColumnWithName(prefix, "wgbez")
+}
+
+object C_mdm extends C_mdm("") {
+  def withDFAlias(alias: String): C_mdm = new C_mdm(alias)
+  def withoutDFAlias: C_mdm = this
+
+  @deprecated("Use withDFAlias instead.", "")
+  def as(alias: String): C_mdm = withDFAlias(alias)
+}
+// COLUMN ACCESSOR AUTO GENERATED:END

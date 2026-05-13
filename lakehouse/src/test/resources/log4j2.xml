@@ -10,7 +10,16 @@
     <Root level="ERROR">
       <AppenderRef ref="console.always" />
     </Root>
-    <Logger name="ct.dna" level="debug" additivity="false">
+    <Logger name="ct.dna" level="warn" additivity="false">
+      <AppenderRef ref="console.always" />
+    </Logger>
+    <Logger name="ct.dna.lakehouse" level="info" additivity="false">
+      <AppenderRef ref="console.always" />
+    </Logger>
+    <Logger name="ct.dna.lakehouse.core" level="error" additivity="false">
+      <AppenderRef ref="console.always" />
+    </Logger>
+    <Logger name="ct.dna.utils.runtime" level="debug" additivity="false">
       <AppenderRef ref="console.always" />
     </Logger>
   </Loggers>

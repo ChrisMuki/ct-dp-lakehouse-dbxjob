@@ -1,95 +1,112 @@
 # dp-lakehouse-dbxjob
 
-A Databricks Lakehouse job that ingests SAP and non-SAP data from multiple source systems, applies change-data-capture transformations, and materialises curated Delta tables in Unity Catalog. The project implements the **Data Platform Pipeline** pattern from the `libraries-main` monorepo and deploys as a fat JAR via Databricks Asset Bundles.
+A Databricks Lakehouse job that ingests SAP and non-SAP data from multiple source systems, applies change-data-capture transformations, and materialises curated Delta tables in Unity Catalog. The project implements the **Data Platform Pipeline** pattern from `lakehouse-core` and deploys as a fat JAR via Databricks Asset Bundles.
 
 ## Architecture Overview
 
-The pipeline follows a two-layer generated lakehouse architecture in this branch:
+The lakehouse is split across a chain of layered sbt subprojects, mirrored by the package layout under `ct.dna.lakehouse`:
 
 ```
               16 SAP systems + 8 non-SAP sources
                          │
                 ┌────────▼────────┐
-                │     sr_raw      │   Raw ingestion layer
-                │  (856 tables)   │   Auto-generated from Unity Catalog
-                │  Loaded tables  │   metadata via GenerateSrRaw
+                │     sr_raw      │   Raw ingestion layer (~856 tables)
+                │   lakehouse-sr  │   Auto-generated `Loaded` TableSpecs
                 └────────┬────────┘
                          │
                 ┌────────▼────────┐
-                │       sr        │   Standardised layer
-                │  (509 tables)   │   Auto-generated from sr_table_def.json
-                │  ChangeKey CDC  │   via GenerateSr. SAP type mapping,
-                │                 │   PK filtering, column renaming
+                │       sr        │   Standardised layer (~509 tables)
+                │   lakehouse-sr  │   Auto-generated ChangeKey TableSpecs
+                └────────┬────────┘
+                         │
+                ┌────────▼────────┐
+                │       dw        │   Data warehouse (placeholder)
+                │   lakehouse-dw  │
+                └────────┬────────┘
+                         │
+                ┌────────▼────────┐
+                │       dm        │   Data marts — hand-written transforms
+                │   lakehouse-dm  │   currently `dm_md/fin_hawk`
+                └────────┬────────┘
+                         │
+                ┌────────▼────────┐
+                │       sm        │   Service marts (placeholder)
+                │   lakehouse-sm  │
+                └────────┬────────┘
+                         │
+                ┌────────▼────────┐
+                │   job runtime   │   `TableUpdaterEntryPoint`
+                │  lakehouse-job  │   Assembled into `lakehouse.jar`
                 └─────────────────┘
 ```
 
-Each layer uses Delta Lake with **Change Data Feed** enabled, and table updates are driven by the `TableUpdater` framework from `lakehouse-core`.
-
-            The current scope keeps only the generated `sr_raw` and `sr` layers in the repository.
+Each layer uses Delta Lake with **Change Data Feed** enabled. Table updates are driven by the `TableUpdater` framework from `lakehouse-core` and orchestrated by `TableUpdaterEntryPoint` in [lakehouse-job](lakehouse-job/src/main/scala/ct/dna/lakehouse/core/jobs/TableUpdaterEntryPoint.scala). `lakehouse-dw` and `lakehouse-sm` are currently empty placeholders that exist to hold the dependency chain in place.
 
 ## Project Structure
 
 ```
 dp-lakehouse-dbxjob/
-├── build.sbt                          # Multi-project build: lakehouse + cicd
-├── dna-builds.sbt                     # Shared settings: Scala 2.13.16, resolvers, compiler flags
-├── databricks.yml                     # Databricks Asset Bundle definition
+├── build.sbt                  # 8 sbt subprojects (lakehouse layer chain + devops + almond)
+├── dna-builds.sbt             # Shared settings: Scala 2.13.16, DNA BOM 2.4.0, resolvers, compiler flags
+├── databricks.yml             # Databricks Asset Bundle root (bundle name + workspace targets)
 │
-├── lakehouse/                         # ── Main Spark job (assembled into lakehouse.jar) ──
+├── lakehouse-sr/              # SR / SR_RAW layer — auto-generated TableSpecs (no business logic)
 │   └── src/main/scala/ct/dna/lakehouse/
-│       ├── core/
-│       │   ├── package.scala
-│       │   └── jobs/
-│       │       ├── TableUpdaterEntryPoint.scala   # Main class: configFile + package + table args
-│       │       ├── TableUpdaterTask.scala         # Dynamic TableSpec resolution, table creation, update
-│       │       └── TableDependancy.scala          # Placeholder (moved to library)
-│       └── catalog/
-│           ├── sr/                                # ── Standardised layer (auto-generated) ──
-│           │   └── <16 SAP schemas>/              # ~509 tables total
-│           └── sr_raw/                            # ── Raw layer (auto-generated) ──
-│               └── <24 schemas>/                  # ~856 tables total
+│       ├── sr/                # ~509 ChangeKey TableSpecs across 16 SAP schemas
+│       └── sr_raw/            # ~856 Loaded TableSpecs across 24 SAP + non-SAP schemas
 │
-├── cicd/                              # ── Deployment tooling ──
-│   ├── deployTo.sh                    # Local deployment entry point
-│   ├── README.md                      # Deployment documentation
+├── lakehouse-dw/              # Data Warehouse layer (placeholder — depends on lakehouse-sr)
+├── lakehouse-dm/              # Data Mart layer — hand-written transforms (depends on lakehouse-dw)
+│   └── src/main/scala/ct/dna/lakehouse/dm_md/fin_hawk/   # `fin_hawk` SAP master-data transforms
+├── lakehouse-sm/              # Service Mart layer (placeholder — depends on lakehouse-dm)
+│
+├── lakehouse-job/             # Runtime entry point — assembled into `lakehouse.jar`
+│   └── src/main/scala/ct/dna/lakehouse/core/jobs/
+│       ├── TableUpdaterEntryPoint.scala   # Main class: configFile + package + table args
+│       ├── TableUpdaterTask.scala         # Dynamic TableSpec resolution + create/update
+│       └── TableDependancy.scala
+│
+├── devops-sr/                 # SR/SR_RAW source-code generator (Theobald JSON + Unity Catalog)
+│   └── src/main/scala/ct/dna/lakehouse/srGenerator/
+│       └── Generator.scala    # Replaces former GenerateSrRaw + GenerateSr pair
+│
+├── devops/                    # Deployment tooling + workflow builders + ColumnWithName accessor gen
+│   ├── deployTo.sh            # Local deployment entry point
+│   ├── README.md              # Deployment documentation
+│   ├── SR_GENERATION.md       # SR/SR_RAW generation flow
+│   ├── SR_WORKFLOW_BUILDER.md # In-memory SR workflow construction
 │   └── src/main/scala/ct/dna/lakehouse/
-│       ├── cicd/
-│       │   ├── Deploy.scala                       # Orchestrates: build → validate → upload → deploy
-│       │   ├── models/
-│       │   │   ├── DeploymentConfig.scala         # Config: auth, cluster, schedule, volume
-│       │   │   ├── AsFile.scala                   # YAML serialisation for databricks.yml
-│       │   │   ├── LakeflowJobYamlModel.scala     # Case classes for Databricks YAML structure
-│       │   │   └── ClusterInfo.scala              # Bundle variable placeholders + cluster defaults
-│       │   └── utils/
-│       │       ├── AssetDirectory.scala           # Volume paths, resource file copy, bundle generation
-│       │       └── SrJobYamlGenerator.scala       # SR job YAML generator
+│       ├── cicd/Deploy.scala  # Orchestrates: build → validate → upload → deploy
 │       └── core/
-│           ├── GenerateColumnWithNameAccessor.scala  # Patches ColumnWithName blocks into .scala files
-│           ├── GenerateSrRaw.scala                   # Unity Catalog → sr_raw entity/TableSpec code gen
-│           ├── GenerateSr.scala                      # sr_table_def.json + sr_raw → sr ChangeKey code gen
-│           └── catalog/internal/
-│               └── TableManagerDelegation.scala       # Delegation to core TableManager
-│   └── src/main/resources/
-│       └── generate_sr.json.template                 # Template config for GenerateSr
+│           ├── GenerateColumnWithNameAccessor.scala  # Typed ColumnWithName accessor patcher
+│           ├── SrWorkflowBuilder.scala               # In-memory SR DAB workflow construction
+│           ├── DmWorkflowBuilder.scala               # In-memory DM DAB workflow (one job per dm_md schema)
+│           └── DmDependencyResolver.scala            # Topological DM task ordering
 │
-├── config/                            # Spark config templates for local development
-├── resources/
-│   ├── lakehouse_job.yaml             # Job definition (existing_cluster_id variant)
-│   ├── lakehouse_job.yml              # Job definition (job_clusters variant)
-│   └── sr/
-│       └── sr_table_def.json          # SAP schema definitions (352K lines)
+├── almond/                    # Jupyter / Almond Scala kernel notebook playground (not deployed)
+├── demo/                      # Standalone Scala demo scripts + test data (not deployed)
+│
+├── config/                    # Local dev Spark config (config.json — gitignored)
+│   └── config.json.template
+├── schema_config.json         # Schema/table → Theobald REST endpoint mapping
+├── result_columns.json        # Cached Theobald column-metadata responses
+│
+├── run-all-tables.sh          # Run TableUpdaterEntryPoint for every SR table locally
+├── run-hawk-sr-tables.sh      # Run only the SR tables consumed by `fin_hawk`
+├── run-hawk-dm-tables.sh      # Run the `fin_hawk` DM tables in dependency order
+├── src_schemas.sh             # Hit Theobald endpoints from schema_config.json → result_columns.json
 │
 ├── .github/
-│   ├── workflows/deploy.yml           # CI/CD: build → test → deploy
+│   ├── workflows/deploy.yml   # CI/CD: build → test → assemble → stage devops → deploy
 │   └── actions/
-│       ├── runner-config/             # PATH setup + git safe.directory
-│       └── sbt-credentials/           # Artifactory credential injection
+│       ├── runner-config/     # PATH setup + git safe.directory
+│       └── sbt-credentials/   # Artifactory credential injection
 │
-├── .devcontainer/                     # VS Code dev container (Java 17 + sbt)
-└── project/                           # sbt build configuration
-    ├── build.properties               # sbt 1.11.2
-    ├── plugins.sbt                    # Local plugins
-    └── dna-plugins.sbt                # Shared: native-packager, scalafix, scalafmt, dna-build-tools
+├── .devcontainer/             # VS Code dev container (Java 17 + sbt)
+└── project/                   # sbt build configuration
+    ├── build.properties       # sbt 1.11.2
+    ├── plugins.sbt            # Local plugins
+    └── dna-plugins.sbt        # Shared: native-packager, scalafix, scalafmt, dna-build-tools
 ```
 
 ## Technology Stack
@@ -100,22 +117,24 @@ dp-lakehouse-dbxjob/
 | sbt | 1.11.2 |
 | Java | Eclipse Adoptium 17 |
 | Databricks Runtime | 17.3.x (Spark 4.0.0, Delta 4.0.0) |
-| lakehouse-core | 2.0.3 |
-| dataplatform-core | 1.15.2 |
-| common-utils | 1.16.1 |
-| deploy-utils | 1.13.1 |
-| lakehouse-modelbuilder | 1.2.1 |
-| dbx-runtime | 17.3.0 (Provided) |
-| local-spark-runtime | 17.3.0 (Test) |
+| DNA BOM | 2.4.0 |
+
+All lakehouse, dataplatform, and Spark-runtime library versions (`lakehouse-core`, `dataplatform-core`, `common-utils`, `deploy-utils`, `lakehouse-modelbuilder`, `dbx-runtime`, `local-spark-runtime`) are pinned by the **DNA BOM 2.4.0**, applied via the `useDnaBom` helper in [build.sbt](build.sbt). To change a library version, bump the BOM.
 
 ## sbt Subprojects
 
-| Project | Purpose | Assembly |
-|---|---|---|
-| `lakehouse` | Main Spark job — entities, table definitions, update logic | `lakehouse.jar` (fat JAR) |
-| `cicd` | Deployment — config parsing, asset bundling, Databricks CLI orchestration | staged via `sbt-native-packager` |
+| Project | Depends on | Purpose | Output |
+|---|---|---|---|
+| `devops-sr` | — | SR/SR_RAW source-code generator (Theobald JSON + Unity Catalog → Scala TableSpecs) | runnable via `sbt devops-sr/runMain …` |
+| `lakehouse-sr` | — | Auto-generated SR + SR_RAW data model (no transforms) | layer JAR |
+| `lakehouse-dw` | `lakehouse-sr` | Data warehouse layer (placeholder) | layer JAR |
+| `lakehouse-dm` | `lakehouse-dw` | Data mart layer — hand-written transforms (`dm_md/fin_hawk`) | layer JAR |
+| `lakehouse-sm` | `lakehouse-dm` | Service mart layer (placeholder) | layer JAR |
+| `lakehouse-job` | `lakehouse-sm` | Runtime entry point + `TableUpdater` job framework | **`lakehouse.jar`** (fat JAR via `DbxAssemblyPlugin`) |
+| `devops` | `devops-sr`, `lakehouse-job` | Deployment orchestration, workflow builders, accessor generation | staged via `sbt devops/stage` |
+| `almond` | — | Jupyter/Almond notebook playground (not published, not deployed) | classpath file for Almond kernel |
 
-The `cicd` subproject `dependsOn(lakehouse)` to access entity classes for code generation tasks.
+The layer chain `sr → dw → dm → sm → job` keeps each lakehouse stage independently compilable and forces dependencies to flow strictly upward.
 
 ## Getting Started
 
@@ -130,14 +149,17 @@ The `cicd` subproject `dependsOn(lakehouse)` to access entity classes for code g
 
 ```bash
 sbt clean test                    # Compile and run all tests
-sbt lakehouse/assembly            # Build the fat JAR
+sbt lakehouse/assembly         # Build the fat JAR
+sbt clean test                    # Compile and run all tests across every subproject
+sbt lakehouse/assembly            # Build the fat JAR (lakehouse/target/scala-2.13/lakehouse.jar)
+sbt devops/stage                  # Stage the `deploy` executable under devops/target/universal/stage/bin/
 ```
 
 ### Local Deployment
 
-1. Create a deployment config:
+1. Create a deployment config from the template:
    ```bash
-   cd cicd/src/main/resources/deployment/configFiles/
+   cd devops/src/main/resources/deployment/configFiles/
    cp template.json dev.json
    ```
 
@@ -154,10 +176,10 @@ sbt lakehouse/assembly            # Build the fat JAR
 
 3. Deploy:
    ```bash
-   ./cicd/deployTo.sh dev
+   ./devops/deployTo.sh dev
    ```
 
-   This will: compile, test, assemble the JAR, validate the Databricks bundle, create the Unity Catalog volume, upload the JAR and config files, deploy the bundle, and optionally trigger the job.
+   This compiles, tests, assembles the JAR, validates the Databricks bundle, creates the Unity Catalog volume, uploads the JAR and config files, and deploys the bundle. See [devops/README.md](devops/README.md) for the full reference.
 
 > **Config files are gitignored.** Never commit credentials.
 
@@ -167,7 +189,7 @@ A VS Code dev container is provided with Java 17, Metals, and sbt pre-configured
 
 ## Code Generation
 
-The project has four code-generation workflows. All generators are run via sbt from the project root directory.
+Three code-generation entry points are exposed today; all are run via sbt from the project root.
 
 ### Prerequisites (all generators)
 
@@ -184,221 +206,202 @@ The project has four code-generation workflows. All generators are run via sbt f
 
 ---
 
-### 1. GenerateSrRaw — Raw Layer from Unity Catalog
+### 1. `srGenerator.Generator` — SR + SR_RAW source generation
 
-Connects to a **live Databricks workspace**, reads table metadata from Unity Catalog, and generates `sr_raw/<schema>/<table>.scala` files with entity case classes and `TableSpec with Loaded` objects.
+Lives in [devops-sr/Generator.scala](devops-sr/src/main/scala/ct/dna/lakehouse/srGenerator/Generator.scala). Connects to a **live Databricks workspace**, reads Theobald JSON column metadata + Unity Catalog metadata, and generates both `sr_raw/<schema>/<table>.scala` (Loaded `TableSpec` objects) and `sr/<schema>/<table>.scala` (ChangeKey `TableSpec` objects with SAP type mapping, `preApplyMapping`/`preApplyFilter`, and automatic wide-entity splitting via `Joined[Part1, Part2]` when fields exceed 254).
+
+> This generator replaces the previous separate `GenerateSrRaw` + `GenerateSr` pair. See [devops/SR_GENERATION.md](devops/SR_GENERATION.md) for the full workflow.
 
 **Additional prerequisites:**
-- Active Databricks connectivity (run from a VM or cluster with access to the workspace)
-- A valid Spark configuration that can reach Unity Catalog (set via `generate_sr_raw.json` or Spark config properties)
 
-**Run:**
+- Active Databricks connectivity (run from a VM or cluster with workspace access)
+- A valid Spark configuration that can reach Unity Catalog
+- Theobald JSON metadata at the path configured in [devops-sr/src/main/resources/theobald.json](devops-sr/src/main/resources/theobald.json) and the catalog config in [devops-sr/src/main/resources/generateSourceCatalog.json](devops-sr/src/main/resources/generateSourceCatalog.json)
 
-```bash
-sbt "cicd/runMain ct.dna.lakehouse.core.GenerateSrRaw \
-  baseDir=lakehouse/src/main/scala/ct/dna/lakehouse \
-  basePackage=ct.dna.lakehouse \
-  catalogId={\"name\":\"sr_raw\"}"
-```
-
-**Parameters:**
-
-| Parameter | Description |
-|---|---|
-| `baseDir` | Root directory for generated output (relative to project root) |
-| `basePackage` | Scala base package for the generated files |
-| `catalogId` | JSON object identifying the Unity Catalog catalog to read — `{"name":"sr_raw"}` |
-
-**Output:** `lakehouse/src/main/scala/ct/dna/lakehouse/sr_raw/<schema>/<table>.scala` (~856 files across 24 schemas)
-
-> **Note:** This generator connects to live infrastructure. It requires network access to Databricks and will read real catalog metadata. Running locally without Databricks connectivity will fail.
+**Output:**
+- `lakehouse-sr/src/main/scala/ct/dna/lakehouse/sr_raw/<schema>/<table>.scala` (~856 files across 24 schemas)
+- `lakehouse-sr/src/main/scala/ct/dna/lakehouse/sr/<schema>/<table>.scala` (~509 files across 16 SAP schemas)
 
 ---
 
-### 2. GenerateSr — Standardised Layer from JSON Schema
+### 2. `GenerateColumnWithNameAccessor` — typed column accessors
 
-Reads `resources/sr/sr_table_def.json` (SAP column metadata fetched from Databricks) and cross-references with existing `sr_raw` files to generate `sr/<schema>/<table>.scala` files with:
-- Entity case classes with SAP type mapping (`Decimal`, `Date`, etc.)
-- `ChangeKey` TableSpec objects with `preApplyMapping` and `preApplyFilter`
-- Automatic wide-entity splitting via `Joined[Part1, Part2]` when fields exceed 254
-- Import correction against `ct.dna.lakehouse.core.*` and conditional Spark function imports
-
-**Additional prerequisites:**
-- `resources/sr/sr_table_def.json` must exist (352K-line JSON with SAP column metadata)
-- The `sr_raw/` generated files should already be in place (from step 1)
-- Either pass all generator arguments explicitly or create a config from `cicd/src/main/resources/generate_sr.json.template`
-
-**Run (all tables):**
+Lives in [devops/GenerateColumnWithNameAccessor.scala](devops/src/main/scala/ct/dna/lakehouse/core/GenerateColumnWithNameAccessor.scala). Scans all `TableSpec` objects below a base package and patches typed `ColumnWithName` accessor blocks into each source file using `// AUTO GENERATED:START`/`END` markers.
 
 ```bash
-sbt "cicd/runMain ct.dna.lakehouse.core.GenerateSr \
-  baseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr \
-  basePackage=ct.dna.lakehouse.sr \
-  srTableDefPath=resources/sr/sr_table_def.json \
-  srRawBaseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr_raw"
-```
-
-This reads from `resources/sr/sr_table_def.json` and writes to `lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr/`.
-
-**Run via config file:**
-
-```bash
-cp cicd/src/main/resources/generate_sr.json.template cicd/src/main/resources/generate_sr.json
-sbt "cicd/runMain ct.dna.lakehouse.core.GenerateSr configFile=cicd/src/main/resources/generate_sr.json"
-```
-
-**Run (single schema or table):**
-
-```bash
-# Generate only the CT_GBL_P12 schema
-sbt "cicd/runMain ct.dna.lakehouse.core.GenerateSr \
-  baseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr \
-  basePackage=ct.dna.lakehouse.sr \
-  srTableDefPath=resources/sr/sr_table_def.json \
-  srRawBaseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr_raw \
-  filterSchema=CT_GBL_P12"
-
-# Generate only the MARA table across all schemas
-sbt "cicd/runMain ct.dna.lakehouse.core.GenerateSr \
-  baseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr \
-  basePackage=ct.dna.lakehouse.sr \
-  srTableDefPath=resources/sr/sr_table_def.json \
-  srRawBaseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr_raw \
-  filterTable=MARA"
-
-# Generate one specific table in one schema
-sbt "cicd/runMain ct.dna.lakehouse.core.GenerateSr \
-  baseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr \
-  basePackage=ct.dna.lakehouse.sr \
-  srTableDefPath=resources/sr/sr_table_def.json \
-  srRawBaseDir=lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr_raw \
-  filterSchema=CT_GBL_P12 \
-  filterTable=MARA"
-```
-
-**Parameters:**
-
-| Parameter | Form | Default | Description |
-|---|---|---|---|
-| `baseDir` | Required key | none | Output directory for generated `.scala` files |
-| `basePackage` | Required key | none | Scala root package for generated SR tables, typically `ct.dna.lakehouse.sr` |
-| `srTableDefPath` | Required key | none | Path to `sr_table_def.json` |
-| `srRawBaseDir` | Required key | none | Directory containing generated `sr_raw/<schema>/<table>.scala` files |
-| `filterSchema` | Optional key | empty | Filter to a single schema (e.g. `CT_GBL_P12`) |
-| `filterTable` | Optional key | empty | Filter to a single table (e.g. `MARA`) |
-| `configFile` | Optional key | `generate_sr.json` | Generator config file consumed by `Configuration` |
-
-**Output:** `lakehouse/src/main/scala/ct/dna/lakehouse/catalog/sr/<schema>/<table>.scala` (~509 files across 16 schemas)
-
----
-
-### 3. GenerateColumnWithNameAccessor — Column Accessors
-
-Scans all `TableSpec` objects and patches typed `ColumnWithName` accessor classes into their source files using `// AUTO GENERATED:START`/`END` markers.
-
-```bash
-sbt "cicd/runMain ct.dna.lakehouse.core.ColumnWithNameAccessor \
+sbt "devops/runMain ct.dna.lakehouse.core.GenerateColumnWithNameAccessor \
   baseDir=lakehouse/src/main/scala/ \
   basePackage=ct.dna.lakehouse"
 ```
 
 ---
 
-### 4. SrJobYamlGenerator — Databricks Job YAML Generation
+### 3. `SrWorkflowBuilder` & `DmWorkflowBuilder` — in-memory DAB jobs
 
-Generates the Databricks Asset Bundle YAML for the shared SR workflow across all discovered SR tables, or a filtered SR-only subset when `--tables` is provided.
+Lakeflow / DAB job definitions are no longer kept as static YAML in the repo. They are constructed in memory at deploy time:
 
-**Run (all discovered SR tables):**
+- **[`SrWorkflowBuilder`](devops/src/main/scala/ct/dna/lakehouse/core/SrWorkflowBuilder.scala)** walks the `sr` `CatalogSpec` and produces one Databricks Job per schema, with one task per discovered SR table. See [devops/SR_WORKFLOW_BUILDER.md](devops/SR_WORKFLOW_BUILDER.md).
+- **[`DmWorkflowBuilder`](devops/src/main/scala/ct/dna/lakehouse/core/DmWorkflowBuilder.scala)** walks the `dm_md` `CatalogSpec` and uses [`DmDependencyResolver`](devops/src/main/scala/ct/dna/lakehouse/core/DmDependencyResolver.scala) to discover the topological order of each DM schema's tables, emitting one `dm_<schema>_job` (e.g. `dm_fin_hawk_job`) DAB job with `SparkJarTask` entries per schema.
 
-```bash
-sbt "cicd/runMain ct.dna.lakehouse.cicd.utils.SrJobYamlGenerator"
-```
-
-That command writes [cicd/resources/sr_job.yml](cicd/resources/sr_job.yml) by default because `cicd/runMain` runs inside the `cicd` subproject and the generator default is `./resources`.
-
-**Run (filtered SR tables):**
-
-```bash
-sbt "cicd/runMain ct.dna.lakehouse.cicd.utils.SrJobYamlGenerator --tables mara,makt"
-```
-
-**Run (custom output directory):**
-
-```bash
-sbt "cicd/runMain ct.dna.lakehouse.cicd.utils.SrJobYamlGenerator /path/to/output"
-```
-
-**Parameters:**
-
-| Parameter | Form | Default | Description |
-|---|---|---|---|
-| Output dir | 1st positional or `--output-dir` | `./resources` | Directory where YAML files are written relative to the `cicd` subproject |
-| Output file | `--output-file` | `sr_job.yml` | Output YAML file name |
-| Prefix | `--prefix` | `sr` | Prefix for generated per-schema job names |
-| Cluster key | `--cluster-key` | `sr-cluster` | Job cluster key written to tasks and clusters |
-| Tables | `--tables` | _(all)_ | Comma-separated SR table filter |
-
-**Output:**
-
-| File | Content |
-|---|---|
-| `cicd/resources/sr_job.yml` | Shared SR workflow, grouped by schema |
+Both builders are invoked by `Deploy` (run via `./devops/deployTo.sh <stage>`) and merged into the bundle alongside [databricks.yml](databricks.yml). They are not normally invoked directly.
 
 ## Job Execution
 
-Each table is updated independently via `TableUpdaterEntryPoint`:
+Each table is updated independently via `TableUpdaterEntryPoint` in [lakehouse-job](lakehouse-job/src/main/scala/ct/dna/lakehouse/core/jobs/TableUpdaterEntryPoint.scala):
 
 ```
 Main class: ct.dna.lakehouse.core.jobs.TableUpdaterEntryPoint
-Arguments:  <configFile> <package_name> <table_name>
+Arguments:  configFile=<path>  <package_name>  <table_name>
 
-Example:    configFile=deployment/configFiles/dev.json  ct.dna.lakehouse.sr.p12  mara
+Example:    configFile=config/config.json  ct.dna.lakehouse.sr.ct_gbl_e32  ekbe
 ```
 
-The `TableUpdaterTask`:
+`TableUpdaterTask`:
 1. Parses config and initialises Spark via `SparkEnv`
 2. Resolves the `TableSpec` object dynamically by fully-qualified class name
 3. Ensures all source tables exist (creates if missing)
 4. Ensures the target table exists
 5. Calls `TableUpdater.update()` which handles CDC via Change Data Feed
 
-### Job Definitions (YAML)
+### Local Run Helpers
 
-Three resource files define the Databricks job structures:
+The following helper scripts wrap `sbt runMain` for common local-run scenarios:
 
-| File | Cluster Strategy | Use Case |
+| Script | Purpose | Key flags |
 |---|---|---|
-| `resources/lakehouse_job.yaml` | `existing_cluster_id` | Attach to a running cluster |
-| `resources/lakehouse_job.yml` | `job_clusters` with autoscale | Dedicated ephemeral cluster |
-| `cicd/resources/sr_job.yml` | `job_clusters` with autoscale | Shared SR workflow across all discovered SR tables |
+| [run-all-tables.sh](run-all-tables.sh) | Iterates every SR schema and runs `TableUpdaterEntryPoint` for each table. | `[configFile]`, `--schema <name>` |
+| [run-hawk-sr-tables.sh](run-hawk-sr-tables.sh) | Discovers (by grepping `import` statements in `lakehouse-dm/`) and runs only the SR tables consumed by `fin_hawk`. | `[configFile]`, `--schema <name>`, `--list` |
+| [run-hawk-dm-tables.sh](run-hawk-dm-tables.sh) | Runs the 10 `fin_hawk` DM tables in topological dependency order. | `[configFile]`, `--list` |
+| [src_schemas.sh](src_schemas.sh) | Hits every Theobald/Xtract endpoint in `schema_config.json` via `curl` and writes responses to `result_columns.json`. | — |
 
-The shared SR YAML is generated by `SrJobYamlGenerator`.
+All local-run scripts default to `config/config.json` (gitignored — copy from [config/config.json.template](config/config.json.template)).
+
+### Job Definitions
+
+DAB job definitions are **no longer static YAML files**. They are constructed in memory at deploy time by [`CatalogWorkflowBuilder`](devops/src/main/scala/ct/dna/lakehouse/core/CatalogWorkflowBuilder.scala) — one Databricks Job per `CatalogSpec`, each emitting one `Orchestrator` task plus N `Worker_$i` tasks that share a single `job_cluster` driver JVM. The bundle is merged with the root [databricks.yml](databricks.yml). See [devops/SR_WORKFLOW_BUILDER.md](devops/SR_WORKFLOW_BUILDER.md) for historical context.
+
+### Catalog Orchestrator
+
+Each catalog (`sr`, `dm_md`, …) deploys as **one Databricks Job**. Inside that job, an `Orchestrator` task and N `Worker_$i` tasks run in parallel on the same `job_cluster` and communicate through a JVM-static [`CatalogOrchestrator`](lakehouse-job/src/main/scala/ct/dna/lakehouse/core/jobs/orchestrator/CatalogOrchestrator.scala) singleton — no `depends_on` edges between Databricks tasks.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Databricks Workspace                                               │
+│                                                                     │
+│  ┌─────────────────────────┐    ┌─────────────────────────┐         │
+│  │   Job: lakehouse-sr     │    │  Job: lakehouse-dm_md   │         │
+│  │   (schedule: 02:00 UTC) │    │  (schedule: 04:00 UTC)  │         │
+│  │   job_cluster:          │    │   job_cluster:          │         │
+│  │     sr-cluster          │    │     dm_md-cluster       │         │
+│  └─────────────────────────┘    └─────────────────────────┘         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Inside one catalog job (single driver JVM, parallel tasks, no `depends_on`):
+
+```
+                ┌──────────────────────────────────────────────────┐
+                │  Job: lakehouse-sr   ·   job_cluster=sr-cluster  │
+                └──────────────────────────────────────────────────┘
+                                       │
+        ┌────────────┬────────────┬────┴───────┬────────────┬────────────┐
+        ▼            ▼            ▼            ▼            ▼            ▼
+  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+  │ Orches-  │ │ Worker_0 │ │ Worker_1 │ │ Worker_2 │ │   ...    │ │ Worker_7 │
+  │ trator   │ │ (Spark   │ │ (Spark   │ │ (Spark   │ │          │ │ (Spark   │
+  │ (Setup   │ │  jar     │ │  jar     │ │  jar     │ │          │ │  jar     │
+  │  task)   │ │  task)   │ │  task)   │ │  task)   │ │          │ │  task)   │
+  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+        │            │            │            │            │            │
+        └────────────┴────────────┴─────┬──────┴────────────┴────────────┘
+                                        ▼
+                          ┌──────────────────────────────────┐
+                          │  shared driver JVM singleton:    │
+                          │  CatalogOrchestrator             │
+                          │   ├─ DagQueue[TableID, TableSpec]│
+                          │   ├─ results (ConcurrentHashMap) │
+                          │   ├─ skippedTables               │
+                          │   └─ counters (updated / failed) │
+                          └──────────────────────────────────┘
+```
+
+Task lifecycle:
+
+```
+TIME ──►
+
+Orchestrator   │ ███ resolve catalog ─ enqueue plan ─ start StatusTimer ─ wait for drain ─ summary │
+               │                                                                                  │
+Worker_0       │       █████████████ poll → update → complete ─ poll → update → complete  ...     │
+Worker_1       │       █████████████ poll → update → complete ─ poll → update → complete  ...     │
+   ...                                                                                            │
+Worker_7       │       █████████████ poll → update → complete ─ poll → update → complete  ...     │
+
+                  (every statusIntervalSeconds) Orchestrator logs:
+                    [catalog=sr] uptime=120s, pending=403, running=8, recorded=98 (updated=95, failed=1, skipped=2)
+```
+
+- **Orchestrator** ([`SetupTaskRunner`](lakehouse-job/src/main/scala/ct/dna/lakehouse/core/jobs/orchestrator/SetupTaskRunner.scala)) walks the catalog, builds the **intra-catalog DAG** from each `TableSpec`'s `sourceTableSpecs` (cross-catalog edges filtered, cycles rejected), Kahn topo-sorts it, and `DagQueue.enqueue(tableId, tableSpec, parents)` for every table.
+- **Workers** ([`WorkerTaskRunner`](lakehouse-job/src/main/scala/ct/dna/lakehouse/core/jobs/orchestrator/WorkerTaskRunner.scala)) call `DagQueue.pollOne()` — they only ever receive tables whose parents have already `complete`d. They run [`TableUpdaterCore.update`](lakehouse-job/src/main/scala/ct/dna/lakehouse/core/jobs/orchestrator/TableUpdaterCore.scala) and then `DagQueue.complete(tableId)`, unblocking children.
+- On failure, the worker records `Failed(ex)` and adds all transitive descendants to `skippedTables`; later polls then resolve as `SkippedByAncestor`.
+- The Orchestrator polls a "queue drained" predicate (with `maxRuntimeSeconds` and `drainTimeoutSeconds` deadlines) and exits, ending the Databricks Job.
+
+Per-catalog tuning lives in the deployment config:
+
+```jsonc
+"workerCountDefault": 4,
+"workerCounts":      { "sr": 8, "dm_md": 2 },
+"orchestrator": {
+  "idleSleepSeconds":      5,
+  "statusIntervalSeconds": 60,
+  "maxRuntimeSeconds":     7200,
+  "drainTimeoutSeconds":   600
+}
+```
+
+Adding a new catalog is two changes:
+
+1. Create a package object `extends CatalogSpec` (e.g. `lakehouse-sm/.../sm_yyy/package.scala`).
+2. Add its `srCatalog`-style import + entry to `catalogs: List[CatalogSpec]` in [AssetDirectory.scala](devops/src/main/scala/ct/dna/lakehouse/cicd/utils/AssetDirectory.scala).
+
+Optionally set `schedules`, `workerCounts` entries keyed by the catalog name in the deployment config. `CatalogWorkflowBuilder` then emits a full Job (Orchestrator + N Workers + own cluster) automatically.
+
+## Top-Level Config Files
+
+| File | Purpose |
+|---|---|
+| [databricks.yml](databricks.yml) | DAB root — declares the bundle name and workspace targets (`dev`, etc.). |
+| [config/config.json.template](config/config.json.template) | Local-run Spark config template (`stage`, `clazz`, `workspaceUrl`, `clusterId`, `pat`). Copy to `config/config.json` (gitignored) for local runs. |
+| [schema_config.json](schema_config.json) | Maps SAP schema/table names to Theobald/Xtract REST endpoint URLs (consumed by [src_schemas.sh](src_schemas.sh)). |
+| [result_columns.json](result_columns.json) | Cached output of [src_schemas.sh](src_schemas.sh) — fetched column definitions from Theobald endpoints. |
 
 ## CI/CD
 
 ### GitHub Actions Workflow
 
-The `deploy.yml` workflow handles the full build-deploy lifecycle:
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml) (`Deploy Lakehouse to Databricks`) handles the full build-deploy lifecycle. It runs on the `dna-db` self-hosted runner inside the `dsfacr.azurecr.io/runner/dna_temurin_17:latest` container.
 
-| Trigger | Action |
+| Trigger | Environment |
 |---|---|
-| PR to `main` / `qual` / `dev` | Build + test only |
-| Push to `dev` | Deploy to `DB-DNA-DEV` (development mode) |
-| Push to `qual` | Deploy to `DB-DNA-QUAL` (production mode) |
-| Push to `main` | Deploy to `DB-DNA-PROD` (production mode) |
-| Manual dispatch | Choose environment |
+| Push to `main` | `prod` |
+| Push to `qual` | `qual` |
+| Push to `dev` (or any other branch) | `dev` |
+| Manual dispatch | Choose `dev` / `qual` / `prod` |
 
-### Required Secrets (per GitHub Environment)
+The pipeline runs (in order): checkout → runner config → sbt credentials → stage detection → Azure OIDC login → `sbt "clean;test;lakehouseJob/assembly"` → `sbt "devops/stage"` → `git` identity → `./devops/target/universal/stage/bin/deploy stage=… buildId=… …`.
 
-| Secret | Purpose |
-|---|---|
-| `DB_HOST` | Databricks workspace URL |
-| `ARM_TENANT_ID` | Azure tenant ID |
-| `DB_CLIENT_ID` | Deploying service principal |
-| `DB_CLIENT_SECRET` | SP secret |
-| `ARTIFACTORY_TOKEN` | sbt dependency resolution |
+### Required Variables / Secrets (per GitHub Environment)
 
-See [cicd/README.md](cicd/README.md) for the full configuration reference, including optional cluster settings, schedule configuration, and troubleshooting.
+| Name | Type | Purpose |
+|---|---|---|
+| `DEPLOYMENT_CONFIG` | var | Full JSON deployment config (written to `/tmp/deploy-config.json` at runtime) |
+| `AZURE_CLIENT_ID` | var | Azure AD app for OIDC login |
+| `AZURE_TENANT_ID` | var | Azure tenant ID |
+| `ARTIFACTORY_HOST` | var | Artifactory host for sbt resolver |
+| `ARTIFACTORY_USER` | var | Artifactory username |
+| `ARTIFACTORY_TOKEN` | secret | Artifactory token (sbt dependency resolution) |
+
+See [devops/README.md](devops/README.md) for the full `DEPLOYMENT_CONFIG` schema (auth, cluster settings, schedule configuration, troubleshooting).
 
 ## Source Data Systems
 
@@ -444,9 +447,19 @@ See [cicd/README.md](cicd/README.md) for the full configuration reference, inclu
 
 ## Auto-Generated Code
 
-The `sr/` and `sr_raw/` directories are entirely auto-generated. **Do not edit these files manually.**
+The `lakehouse-sr/.../sr/` and `lakehouse-sr/.../sr_raw/` directories are entirely auto-generated. **Do not edit these files manually.**
 
 - **sr_raw** files: `case class E_<table>` with `_mk_*` header fields + data fields with type suffixes (`_string`, `_int`, `_decimal_X_Y`), plus `object <table> extends TableSpec[E_<table>] with Loaded`
 - **sr** files: `case class Sr<Table>` with mapped Scala types + `@PK`/`@Decimal` annotations, plus `object <table> extends TableSpec[Sr<Table>] with ChangeKey[sr_raw_type]` with `preApplyMapping`, `preApplyFilter`, and `sequenceBy`
 
 Wide entities (>254 fields) are automatically split into `Part1`/`Part2` and connected via `Joined[Part1, Part2]`.
+
+## Further Documentation
+
+| Doc | Covers |
+|---|---|
+| [devops/README.md](devops/README.md) | Local deployment workflow, deployment config schema, troubleshooting. |
+| [devops/SR_GENERATION.md](devops/SR_GENERATION.md) | SR / SR_RAW source-code generation (Theobald + Unity Catalog → Scala). |
+| [devops/SR_WORKFLOW_BUILDER.md](devops/SR_WORKFLOW_BUILDER.md) | In-memory DAB SR workflow construction (replaces static YAML). |
+| [almond/SETUP.md](almond/SETUP.md) | Almond Scala kernel + Jupyter notebook setup. |
+| [lakehouse-dm/src/main/scala/ct/dna/lakehouse/dm_md/fin_hawk/MAKT_WORKFLOW.md](lakehouse-dm/src/main/scala/ct/dna/lakehouse/dm_md/fin_hawk/MAKT_WORKFLOW.md) | `makt` DM table incremental-merge logic and target schema. |

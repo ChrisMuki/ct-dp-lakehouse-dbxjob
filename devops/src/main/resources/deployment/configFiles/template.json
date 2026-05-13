@@ -1,0 +1,57 @@
+{
+  "_comment": "Template for deployment config. Copy to dev.json / prod.json and fill in the values. Fields marked OPTIONAL can be omitted — defaults are shown.",
+  "deploymentConfig": {
+
+    "_comment_1_required": "=== REQUIRED ===",
+
+    "host": "https://adb-XXXXXXXXXXXXXXXX.XX.azuredatabricks.net",
+
+    "_comment_deploymentAzAuth": "Azure authentication. Use 'AzureCli' for local dev (requires 'az login'). For CI/CD, provide ClientSecret fields:",
+    "deploymentAzAuth_option1_cli": "AzureCli",
+    "deploymentAzAuth_option2_sp": {
+      "tenantId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "clientId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "clientSecret": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    },
+
+    "_comment_2_optional": "=== OPTIONAL (all have defaults) ===",
+
+    "_comment_volumeCatalog": "Unity Catalog catalog for job resource volumes. Default: 'lakehouse' (prod) or '<stage>_lakehouse' (dev/qual).",
+    "volumeCatalog": "dev_lakehouse",
+
+    "_comment_volumeSchema": "Schema in the Unity Catalog volume path. Default: 'default'. Typically set to your user ID for dev.",
+    "volumeSchema": "default",
+
+    "_comment_targetMode": "'production' (default) or 'development'. Development mode omits run_as so the job runs as the deploying identity.",
+    "targetMode": "production",
+
+    "_comment_clusterConfiguration": "All sub-fields are optional with defaults. The entire block can be omitted.",
+    "clusterConfiguration": {
+      "sparkVersion": "17.3.x-scala2.13",
+      "clusterPolicyId": "XXXXXXXXXXXXXXXX",
+      "maxWorkerNodes": 4,
+      "nodeTypeId": "Standard_D8ds_v5",
+      "driverNodeTypeId": "Standard_D8ds_v5"
+    },
+
+    "_comment_schedules": "Per-catalog cron schedules, keyed by catalog name (e.g. 'sr', 'dm_md'). Catalogs without an entry are unscheduled.",
+    "schedules": {
+      "sr": {
+        "quartzCronExpression": "0 0 2 * * ?",
+        "timezoneId": "UTC",
+        "pauseStatus": "UNPAUSED"
+      },
+      "dm_md": {
+        "quartzCronExpression": "0 0 4 * * ?",
+        "timezoneId": "UTC",
+        "pauseStatus": "UNPAUSED"
+      }
+    },
+
+    "_comment_permissions": "Target-level permissions applied to all resources in the bundle. Omit to deploy without extra permissions.",
+    "permissions": [
+      {"groupName": "my-usergroup", "level": "CAN_RUN"}
+    ]
+
+  }
+}

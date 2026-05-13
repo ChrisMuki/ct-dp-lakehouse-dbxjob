@@ -1,7 +1,7 @@
 import sbt._
 import Keys._
 
-val maxParallelism = math.max(2, java.lang.Runtime.getRuntime.availableProcessors / 4)
+val maxParallelism = math.min(8, math.max(2, java.lang.Runtime.getRuntime.availableProcessors / 4))
 val artifactoryResolver = "Artifactory Realm" at "https://artifacts.ws.contitech.cloud/artifactory/ctdna-sbt"
 
 // -----------------------------------------------------------------------------

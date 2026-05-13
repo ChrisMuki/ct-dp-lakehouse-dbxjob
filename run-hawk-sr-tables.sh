@@ -71,7 +71,7 @@ run_table() {
   local table="$2"
   echo ""
   echo "▶ $pkg.$table"
-  if sbt "cicd/runMain ct.dna.lakehouse.core.jobs.TableUpdaterEntryPoint configFile=$CONFIG_FILE $pkg $table"; then
+  if sbt "devops/runMain ct.dna.lakehouse.core.jobs.TableUpdaterEntryPoint configFile=$CONFIG_FILE $pkg $table"; then
     succeeded=$((succeeded + 1))
   else
     echo "  [FAILED] $pkg.$table" >&2

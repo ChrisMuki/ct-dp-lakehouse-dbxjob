@@ -67,6 +67,7 @@ jobs:
           echo "STAGE=${STAGE}" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$(date +'%Y%m%d-%H%M')-$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
 
+
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -74,11 +75,14 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
 
-      - name: Build and test lakehouse assembly
-        run: sbt "clean;test;lakehouse/assembly"
-
-      - name: Stage cicd subproject
-        run: sbt "cicd/stage"
+      # One sbt invocation: compile + tests + assembly + stage. `sparkConfig` is read by `Configuration` from the
+      # environment (it wins over any local `test-config.json`) so `TestWithSpark` can spin up a `LocalSpark` session
+      # inside the runner without committing a config file. Use the repo variable so the value is centrally managed
+      # (mirrors the pattern in `libraries/.github/workflows/pr.yml`).
+      - name: Build (test + assembly + stage)
+        env:
+          sparkConfig: ${{ vars.SCALATEST_LOCAL_SPARKCONFIG }}
+        run: sbt "Test/compile" "lakehouse/test" "lakehouse/assembly" "devops/stage"
 
       - name: Configure git identity
         run: |
@@ -96,10 +100,10 @@ jobs:
           CONFIG_FILE="/tmp/deploy-config.json"
           echo '${{ vars.DEPLOYMENT_CONFIG }}' > "${CONFIG_FILE}"
 
-          ./cicd/target/universal/stage/bin/deploy \
+          ./devops/target/universal/stage/bin/deploy \
             "stage=${STAGE}" \
             "buildId=${BUILD_ID}" \
             "rootPath=${GITHUB_WORKSPACE}" \
-            "assetPath=/tmp/cicd" \
+            "assetPath=/tmp/devops" \
             "jarPath=${GITHUB_WORKSPACE}/lakehouse/target/scala-2.13/lakehouse.jar" \
             "configFile=${CONFIG_FILE}"
