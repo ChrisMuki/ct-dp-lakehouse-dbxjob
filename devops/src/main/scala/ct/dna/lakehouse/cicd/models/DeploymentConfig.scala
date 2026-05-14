@@ -1,7 +1,9 @@
 package ct.dna.lakehouse.cicd.models
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import ct.dna.utils.az.auth.AzAuth
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 case class DeploymentConfig(
     host: String,
     /** Unity Catalog catalog backing the Databricks volume for job resources. Defaults to "lakehouse" for prod, "<stage>_lakehouse" for other stages.
@@ -18,6 +20,12 @@ case class DeploymentConfig(
     /** Cluster settings. Entire block is optional — all fields have sensible defaults. Only override what differs from the defaults for your environment.
       */
     clusterConfiguration: DeploymentConfig.ClusterConfiguration = DeploymentConfig.ClusterConfiguration(),
+    /** Per-catalog overrides on top of [[clusterConfiguration]], keyed by catalog name (e.g. "sr", "dm_md"). Each override field is optional and falls back to
+      * the corresponding value from the global `clusterConfiguration` when absent. `sparkConf` is shallow-merged (per-catalog entries win on key collisions).
+      * Use to tune executor/driver size and shuffle config differently for catalogs whose workloads differ a lot in table-size distribution (e.g. SR = many
+      * small tables, DM = few large tables).
+      */
+    clusterConfigurations: Map[String, DeploymentConfig.ClusterConfigurationOverride] = Map.empty,
     /** Per-catalog cron schedules, keyed by catalog name (e.g. "sr", "dm_md"). Catalogs without an entry are deployed unscheduled (triggered manually or via
       * API). Use this to give each layer its own cadence.
       */
@@ -27,16 +35,17 @@ case class DeploymentConfig(
       * set on the same job). Catalogs without an entry behave according to their `schedules` entry (or are manual-trigger only).
       */
     continuous: Map[String, DeploymentConfig.ContinuousConfig] = Map.empty,
-    /** Default number of `Worker_$i` tasks emitted per catalog by `CatalogWorkflowBuilder`. Override per catalog via [[workerCounts]] for layers that need more
-      * parallelism (e.g. `sr` with hundreds of tables) or less (small data marts).
+    /** Default number of tables run concurrently per catalog (in-JVM thread parallelism inside the single Databricks WorkerPool task). Override per catalog via
+      * [[taskParallelism]] for layers that need more parallelism (e.g. `sr` with hundreds of tables) or less (small data marts). NOTE: this is **not** the
+      * Spark executor / cluster-worker count — that lives under `clusterConfiguration.maxWorkerNodes`.
       */
-    workerCountDefault: Int = 4,
-    /** Per-catalog overrides for the number of worker tasks. Missing entries fall back to [[workerCountDefault]]. */
-    workerCounts: Map[String, Int] = Map.empty,
-    /** Orchestrator-side runtime knobs (idle sleep, status interval, drain timeout, …). Serialised as JSON and passed to every catalog task as
-      * `orchestratorConfig=<json>`.
+    taskParallelismDefault: Int = 4,
+    /** Per-catalog overrides for the in-JVM table parallelism. Missing entries fall back to [[taskParallelismDefault]]. */
+    taskParallelism: Map[String, Int] = Map.empty,
+    /** Logging / monitoring runtime knobs (idle sleep, status interval, summary table coordinates, …). Serialised as JSON and passed to every catalog task as
+      * `monitoringConfig=<json>`.
       */
-    orchestrator: DeploymentConfig.OrchestratorRuntimeConfig = DeploymentConfig.OrchestratorRuntimeConfig(),
+    monitoring: DeploymentConfig.MonitoringConfig = DeploymentConfig.MonitoringConfig(),
     /** "production" (default) or "development". In development mode the Databricks CLI ignores run_as and prefixes the job name with [dev <username>], so the
       * job runs as the deploying identity (PAT owner or OAuth-M2M SP).
       */
@@ -71,6 +80,20 @@ object DeploymentConfig {
       )
   )
 
+  /** Optional per-catalog override applied on top of the global [[ClusterConfiguration]]. Every field is optional; absent fields inherit the global value. The
+    * `sparkConf` map is shallow-merged with per-catalog entries winning on key collisions, so you can add a few extra knobs without restating the whole global
+    * map.
+    */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  case class ClusterConfigurationOverride(
+      sparkVersion: Option[String] = None,
+      clusterPolicyId: Option[String] = None,
+      maxWorkerNodes: Option[Int] = None,
+      nodeTypeId: Option[String] = None,
+      driverNodeTypeId: Option[String] = None,
+      sparkConf: Map[String, String] = Map.empty
+  )
+
   /** Quartz-based cron schedule for the Databricks job. quartzCronExpression — e.g. "0 0 * ? * *" for every hour on the hour. timezoneId — IANA timezone,
     * defaults to "UTC". pauseStatus — "UNPAUSED" (run) or "PAUSED" (skip). Defaults to "UNPAUSED".
     */
@@ -96,22 +119,16 @@ object DeploymentConfig {
       level: String
   )
 
-  /** Runtime knobs for the per-catalog orchestrator. Serialised verbatim into the `orchestratorConfig` Spark argument so the runtime `OrchestratorConfig` case
-    * class can `mapper.readValue[OrchestratorConfig]` it.
+  /** Logging / monitoring runtime knobs for a catalog job. Serialised verbatim into the `monitoringConfig` Spark argument so the runtime `MonitoringConfig`
+    * case class can `mapper.readValue[MonitoringConfig]` it.
     *
-    * Field semantics must stay in sync with `ct.dna.lakehouse.core.jobs.orchestrator.OrchestratorConfig` in the `lakehouse` project.
+    * Field semantics must stay in sync with `ct.dna.lakehouse.core.jobs.orchestrator.MonitoringConfig` in the `lakehouse` project.
     */
-  case class OrchestratorRuntimeConfig(
-      /** How long a worker sleeps when `pollOne()` returns empty (and the queue is not yet drained). */
+  case class MonitoringConfig(
+      /** How long an in-JVM worker sleeps when the shared queue returns empty (and the queue is not yet drained). */
       idleSleepSeconds: Long = 5,
-      /** Interval at which the Monitor logs the consolidated live status line. */
+      /** Interval at which the WorkerPool task logs the consolidated live status block. */
       statusIntervalSeconds: Int = 60,
-      /** Hard cap on wall-clock runtime. `0` disables. */
-      maxRuntimeSeconds: Long = 0,
-      /** Max time the Monitor waits for in-flight workers to drain after the queue empties. `0` waits forever. */
-      drainTimeoutSeconds: Long = 0,
-      /** Stall detector: signal shutdown when no table outcome has been recorded for this many seconds. `0` disables. */
-      noProgressTimeoutSeconds: Long = 0,
       /** Override the Unity Catalog catalog for the summary Delta table. Defaults to `deploymentConfig.volumeCatalog`. */
       summaryCatalog: Option[String] = None,
       /** Override the Unity Catalog schema for the summary Delta table. Defaults to `deploymentConfig.volumeSchema`. */
@@ -123,10 +140,6 @@ object DeploymentConfig {
       /** Table name for the per-table results table appended by every Worker. Lives in the same `summaryCatalog`/`summarySchema`. */
       tableRunsTable: String = "lakehouse_table_runs",
       /** When `false`, Workers/Summary skip the per-table Delta writes. */
-      tableRunsEnabled: Boolean = true,
-      /** Override the UC volume directory that hosts live worker heartbeat JSON files. Defaults to `<jobResourcesPath>/heartbeat` (resolved per-stage in
-        * `AssetDirectory`). The trailing `/<runId>` is appended at runtime by each task.
-        */
-      heartbeatDir: Option[String] = None
+      tableRunsEnabled: Boolean = true
   )
 }

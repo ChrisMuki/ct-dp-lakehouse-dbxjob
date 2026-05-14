@@ -11,7 +11,7 @@ import ct.dna.utils.runtime.Configuration
 /** Body of the "Sun" task ([[OrchestratorTask.JobSetup]]).
   *
   * Bootstraps shared state before the Orchestrator and Workers start. After this task succeeds the following invariants hold for downstream tasks:
-  *   - [[CatalogOrchestrator.orchestratorConfig]] is non-null.
+  *   - [[CatalogOrchestrator.monitoringConfig]] is non-null.
   *   - [[CatalogOrchestrator.catalogSpec]] is non-null.
   *   - [[CatalogOrchestrator.queue]] contains every catalog table with its parent set wired.
   *   - [[CatalogOrchestrator.transitiveDescendants]] is populated.
@@ -34,19 +34,19 @@ private[orchestrator] object JobSetupTaskRunner extends LoggingTrait {
     val parsed =
       Configuration
         .required("rootDir")
-        .required("orchestratorConfig")
+        .required("monitoringConfig")
         .withSparkConfig
         .build(task.runtimeArgs)
 
-    val orchestratorConfig = mapper.readValue[OrchestratorConfig](parsed.getProperty("orchestratorConfig"))
-    CatalogOrchestrator.orchestratorConfig.set(orchestratorConfig)
+    val monitoringConfig = mapper.readValue[MonitoringConfig](parsed.getProperty("monitoringConfig"))
+    CatalogOrchestrator.monitoringConfig.set(monitoringConfig)
 
     SparkEnv.ensureInitialized(parsed.getSparkConfig)
 
     val catalogSpec = resolveCatalog(task.catalogClass)
     CatalogOrchestrator.catalogSpec.set(catalogSpec)
 
-    logger.info(s"JobSetup starting for catalog '${catalogSpec.id.name}' (workerCount=${orchestratorConfig.workerCount})")
+    logger.info(s"JobSetup starting for catalog '${catalogSpec.id.name}'")
 
     try {
       val (plan, descendants) = CatalogOrchestrator.buildPlan(catalogSpec)
@@ -57,16 +57,21 @@ private[orchestrator] object JobSetupTaskRunner extends LoggingTrait {
       }
       logger.info(s"JobSetup enqueued ${plan.size} table(s) for catalog '${catalogSpec.id.name}'")
 
-      // Live monitor: announce the run so Monitor can compute "X / total processed" without polling Spark.
-      HeartbeatStore.writeRunInfo(
-        orchestratorConfig,
-        HeartbeatStore.RunInfo(
-          runId = task.runId,
-          catalog = catalogSpec.id.name,
-          totalTables = plan.size,
-          startedAtMs = CatalogOrchestrator.runStartMs.get().longValue()
-        )
+      // DAG-shape overview: if `edges == 0` the layer is effectively a flat queue (e.g. SR ← SR_RAW 1:1) and
+      // intra-catalog ordering / cascade-skip never kick in. If `edges > 0` there is real intra-catalog wiring
+      // and some workers may have to idle-wait for parents to complete.
+      val schemas = plan.iterator.map(_._1.id.schemaId.name).toSet
+      val roots = plan.count(_._2.isEmpty)
+      val edges = plan.iterator.map(_._2.size).sum
+      val maxParents = if (plan.isEmpty) 0 else plan.iterator.map(_._2.size).max
+      val maxDescendants = if (descendants.isEmpty) 0 else descendants.values.iterator.map(_.size).max
+      logger.warn(
+        s"PLAN [${catalogSpec.id.name}] tables=${plan.size} schemas=${schemas.size} " +
+          s"roots=$roots edges=$edges maxParents=$maxParents maxDescendants=$maxDescendants"
       )
+
+      // Live monitor: announce the run so Monitor can compute "X / total processed" without polling Spark.
+      CatalogOrchestrator.totalTables.set(plan.size)
     } catch {
       case t: Throwable =>
         CatalogOrchestrator.setupError.set(t)

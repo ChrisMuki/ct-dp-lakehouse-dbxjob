@@ -96,9 +96,14 @@ jobs:
           STAGE="${{ steps.stage.outputs.STAGE }}"
           BUILD_ID="${{ steps.stage.outputs.BUILD_ID }}"
 
-          # Write deployment config from environment variable to a temp file
-          CONFIG_FILE="/tmp/deploy-config.json"
-          echo '${{ vars.DEPLOYMENT_CONFIG }}' > "${CONFIG_FILE}"
+          # Deployment config is committed in-repo (no secrets). Local per-user overrides under
+          # devops/src/main/resources/deployment/configFiles/<stage>.local.json are deep-merged by the
+          # Scala launcher; they don't exist in CI so the committed file is used as-is.
+          CONFIG_FILE="${GITHUB_WORKSPACE}/devops/src/main/resources/deployment/configFiles/${STAGE}.json"
+          if [ ! -f "${CONFIG_FILE}" ]; then
+            echo "::error::Deployment config not found: ${CONFIG_FILE}"
+            exit 1
+          fi
 
           ./devops/target/universal/stage/bin/deploy \
             "stage=${STAGE}" \

@@ -71,10 +71,10 @@ private[orchestrator] object TableRunsWriter extends LoggingTrait {
     )
   )
 
-  /** Resolves the fully-qualified table name from `OrchestratorConfig` summaryCatalog/summarySchema (which `AssetDirectory` defaults to the deployment's
+  /** Resolves the fully-qualified table name from `MonitoringConfig` summaryCatalog/summarySchema (which `AssetDirectory` defaults to the deployment's
     * volumeCatalog/volumeSchema). Returns `None` when either coordinate is missing — caller treats as "feature disabled".
     */
-  def resolveTableFqn(cfg: OrchestratorConfig): Option[String] =
+  def resolveTableFqn(cfg: MonitoringConfig): Option[String] =
     for {
       catalog <- cfg.summaryCatalog
       schema <- cfg.summarySchema
@@ -83,7 +83,7 @@ private[orchestrator] object TableRunsWriter extends LoggingTrait {
   /** Append a batch of rows. Caller owns enabling/disabling via `cfg.tableRunsEnabled`. No-op for empty input. Best-effort: a Delta failure is logged at WARN
     * and swallowed.
     */
-  def appendBatch(cfg: OrchestratorConfig, rows: Iterable[TableRunRow]): Unit = {
+  def appendBatch(cfg: MonitoringConfig, rows: Iterable[TableRunRow]): Unit = {
     if (rows.isEmpty) return
     val tableFqn = resolveTableFqn(cfg).getOrElse {
       logger.warn("Table-runs catalog/schema not configured (summaryCatalog/summarySchema=None) — skipping per-table Delta write")

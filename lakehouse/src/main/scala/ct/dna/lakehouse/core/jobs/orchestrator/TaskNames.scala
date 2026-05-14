@@ -2,20 +2,15 @@ package ct.dna.lakehouse.core.jobs.orchestrator
 
 /** Task naming convention for a catalog job's DAG.
   *
-  * The job emits four roles connected by explicit `depends_on` edges:
+  * The job emits three roles connected by explicit `depends_on` edges:
   *
   * {{{
-  *                ┌── Worker_0 ──┐
-  *                ├── Worker_1 ──┤
-  *   JobSetup ────┤      …       ├──── Summary (run_if: ALL_DONE)
-  *                ├── Worker_N ──┤
-  *                └── Monitor ───┘
+  *   JobSetup ────▶ Worker (WorkerPool) ────▶ Summary (run_if: ALL_DONE)
   * }}}
   *
-  *   - `JobSetup` — boots the catalog, builds and enqueues the plan, writes the heartbeat `run.json`.
-  *   - `Worker_$i` — fleet of poll-loop workers that drain the shared `DagQueue`; each emits START/IN-PROGRESS/END to its Output tab and overwrites its
-  *     `worker_<i>.json` heartbeat on every state change.
-  *   - `Monitor` — long-lived observer; reads the heartbeat directory every `statusIntervalSeconds` and prints the consolidated `STATUS` line.
+  *   - `JobSetup` — boots the catalog, builds and enqueues the plan.
+  *   - `Worker` — single Databricks task that runs `poolSize` worker threads draining the shared `DagQueue`, plus an in-process status reporter that emits the
+  *     consolidated `STATUS` block to the same Output tab.
   *   - `Summary` — terminal observer (runs `ALL_DONE`), writes the per-run summary row to the configured summary Delta table and emits the final SUMMARY log
   *     line.
   *
@@ -25,9 +20,18 @@ object TaskNames {
 
   /** System-task `taskKey`s. Kept here so [[ct.dna.lakehouse.core.CatalogWorkflowBuilder]] and the runners stay in sync. */
   val SetupTaskKey: String = "JobSetup"
-  val MonitorTaskKey: String = "Monitor"
   val SummaryTaskKey: String = "Summary"
 
-  /** Resolve a worker `taskKey` for index `i` (e.g. `Worker_0`, `Worker_1`, …). */
-  def workerName(i: Int): String = s"Worker_$i"
+  /** Single-task replacement for the historical `Worker_0 … Worker_N` fan-out. Runs `poolSize` worker threads + one status-reporter thread in the same
+    * driver-REPL JVM, so the bundle only declares one Databricks task regardless of pool size.
+    */
+  val WorkerTaskKey: String = "Worker"
+
+  /** Resolve a worker thread name for index `i` within a pool of `poolSize` (e.g. `task-00`, `task-01`, …). Zero-padded to at least 2 digits so logs stay
+    * column-aligned. These names are also used as Spark `setJobGroup` description prefix so individual table updates can be located in the Spark UI.
+    */
+  def workerName(i: Int, poolSize: Int): String = {
+    val width = math.max(2, math.max(1, poolSize - 1).toString.length)
+    s"task-${"%0" + width + "d" format i}"
+  }
 }

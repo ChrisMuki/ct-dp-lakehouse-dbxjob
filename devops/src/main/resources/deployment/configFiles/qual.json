@@ -1,16 +1,16 @@
 {
   "deploymentConfig": {
-    "host": "https://adb-7405608343332957.17.azuredatabricks.net",
-    "volumeCatalog": "lakehouse",
-    "volumeSchema": "sp_1043_edap_prod_dbxjob_lakehouse",
+    "host": "https://adb-7405617504226685.5.azuredatabricks.net",
+    "volumeCatalog": "qual_lakehouse",
+    "volumeSchema": "sp_1043_edap_qual_dbxjob_lakehouse",
     "targetMode": "production",
     "deploymentAzAuth": "AzureCli",
     "clusterConfiguration": {
       "sparkVersion": "17.3.x-scala2.13",
-      "clusterPolicyId": "0009D8E7AF32CDAF",
+      "clusterPolicyId": "001F2C351BFE187D",
       "maxWorkerNodes": 8,
       "nodeTypeId": "Standard_D4ds_v5",
-      "driverNodeTypeId": "Standard_E8ds_v5",
+      "driverNodeTypeId": "Standard_D4ds_v5",
       "sparkConf": {
         "spark.databricks.queryTagging.enabled": "false",
         "spark.databricks.aggressiveWindowDownS": "1200",
@@ -28,19 +28,19 @@
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
     "clusterConfigurations": {
       "sr": {
-        "_comment": "Many small SR tables (1:1 from SR_RAW). 8 x D8ds_v5 = 64 cores with 300GB local SSD per node; halves shuffle hops vs. 16 x D4ds_v5 and avoids managed-disk auto-expansion that consistently fires with the 4-core nodes.",
-        "nodeTypeId": "Standard_D8ds_v5",
+        "_comment": "Qual SR: same shape as prod (wide+thin) at reduced scale.",
+        "nodeTypeId": "Standard_D4ds_v5",
         "driverNodeTypeId": "Standard_E8ds_v5",
-        "maxWorkerNodes": 8,
+        "maxWorkerNodes": 6,
         "sparkConf": {
           "spark.sql.shuffle.partitions": "64"
         }
       },
       "dm_md": {
-        "_comment": "Few large DM/MD tables. Deep+fat memory-optimized executors; smaller driver since fewer concurrent worker JVMs.",
+        "_comment": "Qual DM: deep+fat at reduced scale.",
         "nodeTypeId": "Standard_E8ds_v5",
         "driverNodeTypeId": "Standard_D8ds_v5",
-        "maxWorkerNodes": 8,
+        "maxWorkerNodes": 4,
         "sparkConf": {
           "spark.sql.shuffle.partitions": "800"
         }
@@ -48,7 +48,7 @@
     },
     "permissions": [
       {
-        "groupName": "au00_1043_EDAP_prod_DevOps",
+        "groupName": "au00_1043_EDAP_qual_DevOps",
         "level": "CAN_RUN"
       }
     ],
@@ -65,9 +65,9 @@
       }
     },
     "continuous": {},
-    "taskParallelismDefault": 4,
+    "taskParallelismDefault": 3,
     "taskParallelism": {
-      "sr": 24,
+      "sr": 4,
       "dm_md": 2
     },
     "monitoring": {

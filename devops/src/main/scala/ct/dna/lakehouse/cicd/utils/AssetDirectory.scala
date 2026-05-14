@@ -87,41 +87,59 @@ case class AssetDirectory(
     logger.info("Building 'databricks.yml'")
 
     val cc = deploymentConfig.clusterConfiguration
+    val ccOverrides = deploymentConfig.clusterConfigurations
     val jarPath = s"${jobResourcesLatestPath}/lakehouse.jar"
     val configFilePath = s"${jobResourcesLatestPath}/config.json"
 
-    /** Build a `JobCluster` for a given catalog. One cluster is created per catalog job so each catalog can later be tuned independently if needed. */
-    def buildJobCluster(catalogName: String): JobCluster = JobCluster(
-      jobClusterKey = s"${catalogName}-cluster",
-      newCluster = NewCluster(
-        sparkVersion = cc.sparkVersion,
-        azureAttributes = AzureAttributes(
-          availability = "SPOT_WITH_FALLBACK_AZURE",
-          spotBidMaxPrice = 100
-        ),
-        nodeTypeId = cc.nodeTypeId,
-        driverNodeTypeId = cc.driverNodeTypeId,
-        clusterLogConf = ClusterLogConf(
-          volumes = ClusterLogConfDestination(destination = s"${jobResourcesLatestPath}/logs")
-        ),
-        // `NewCluster.sparkConf` is a typed field on the upstream case class; merge the hard-coded `aggressiveWindowDownS`
-        // tweak with the per-stage overrides from `clusterConfiguration.sparkConf` (stage config wins on key collisions).
-        sparkConf = cc.sparkConf,
-        sparkEnvVars = null,
-        initScripts = List(
-          JobInitScript(
-            volumes = JobInitScriptVolumes(destination = s"$jobResourcesLatestPath/init_script.sh")
-          )
-        ),
-        policyId = cc.clusterPolicyId.orNull,
-        workloadType = WorkloadType(clients = WorkloadTypeClients(notebooks = false, jobs = true)),
-        dataSecurityMode = "SINGLE_USER",
-        runtimeEngine = "PHOTON",
-        kind = "CLASSIC_PREVIEW",
-        isSingleNode = false,
-        autoscale = Autoscale(minWorkers = 1, maxWorkers = cc.maxWorkerNodes)
+    /** Build a `JobCluster` for a given catalog. One cluster is created per catalog job so each catalog can be tuned independently via
+      * `deploymentConfig.clusterConfigurations[<catalogName>]`. Per-catalog overrides win; absent fields inherit the global `clusterConfiguration`. `sparkConf`
+      * is shallow-merged (per-catalog entries override the global on key collisions).
+      */
+    def buildJobCluster(catalogName: String): JobCluster = {
+      val ov = ccOverrides.getOrElse(catalogName, DeploymentConfig.ClusterConfigurationOverride())
+      val effectiveSparkConf = cc.sparkConf ++ ov.sparkConf
+      val effectiveNodeType = ov.nodeTypeId.getOrElse(cc.nodeTypeId)
+      val effectiveDriverNodeType = ov.driverNodeTypeId.getOrElse(cc.driverNodeTypeId)
+      val effectiveSparkVersion = ov.sparkVersion.getOrElse(cc.sparkVersion)
+      // Jackson stores `Option[Int]` as `Option[java.lang.Long]` due to type erasure;
+      // any direct unbox-to-Int (including `.map(identity)`) throws ClassCastException.
+      // Erase to `Option[Any]` first, then coerce the boxed `Number` explicitly.
+      val effectiveMaxWorkers: Int =
+        ov.maxWorkerNodes.asInstanceOf[Option[Any]] match {
+          case Some(n) => n.asInstanceOf[Number].intValue
+          case None    => cc.maxWorkerNodes
+        }
+      val effectivePolicyId = ov.clusterPolicyId.orElse(cc.clusterPolicyId)
+      JobCluster(
+        jobClusterKey = s"${catalogName}-cluster",
+        newCluster = NewCluster(
+          sparkVersion = effectiveSparkVersion,
+          azureAttributes = AzureAttributes(
+            availability = "SPOT_WITH_FALLBACK_AZURE",
+            spotBidMaxPrice = 100
+          ),
+          nodeTypeId = effectiveNodeType,
+          driverNodeTypeId = effectiveDriverNodeType,
+          clusterLogConf = ClusterLogConf(
+            volumes = ClusterLogConfDestination(destination = s"${jobResourcesLatestPath}/logs")
+          ),
+          sparkConf = effectiveSparkConf,
+          sparkEnvVars = null,
+          initScripts = List(
+            JobInitScript(
+              volumes = JobInitScriptVolumes(destination = s"$jobResourcesLatestPath/init_script.sh")
+            )
+          ),
+          policyId = effectivePolicyId.orNull,
+          workloadType = WorkloadType(clients = WorkloadTypeClients(notebooks = false, jobs = true)),
+          dataSecurityMode = "SINGLE_USER",
+          runtimeEngine = "PHOTON",
+          kind = "CLASSIC_PREVIEW",
+          isSingleNode = false,
+          autoscale = Autoscale(minWorkers = 1, maxWorkers = effectiveMaxWorkers)
+        )
       )
-    )
+    }
 
     val bundle = Bundle(name = "dp-lakehouse-dbxjob")
     val targetPermissions = deploymentConfig.permissions.map(p => Permission(groupName = Some(p.groupName), level = p.level))
@@ -161,40 +179,38 @@ case class AssetDirectory(
       */
     val catalogs: List[CatalogSpec] = List(srCatalog, dmCatalog)
 
-    // Orchestrator runtime config is shared across every catalog job; serialised
-    // once and passed verbatim as the `orchestratorConfig=<json>` Spark argument.
-    // Field set is a superset-compatible match for `OrchestratorConfig` in the
+    // Monitoring runtime config is shared across every catalog job; serialised
+    // once and passed verbatim as the `monitoringConfig=<json>` Spark argument.
+    // Field set is a superset-compatible match for `MonitoringConfig` in the
     // `lakehouse` module. Default the summary/table-runs coordinates to the deployment's
-    // volume catalog/schema, and the heartbeat directory to a stable subpath under the
-    // shared volume so operators don't need extra Unity Catalog provisioning.
-    val orchestratorWithDefaults = deploymentConfig.orchestrator.copy(
-      summaryCatalog = deploymentConfig.orchestrator.summaryCatalog.orElse(Some(volumeCatalog)),
-      summarySchema = deploymentConfig.orchestrator.summarySchema.orElse(Some(volumeSchema)),
-      heartbeatDir = deploymentConfig.orchestrator.heartbeatDir.orElse(Some(s"$jobResourcesLatestPath/heartbeat"))
+    // volume catalog/schema.
+    val monitoringWithDefaults = deploymentConfig.monitoring.copy(
+      summaryCatalog = deploymentConfig.monitoring.summaryCatalog.orElse(Some(volumeCatalog)),
+      summarySchema = deploymentConfig.monitoring.summarySchema.orElse(Some(volumeSchema))
     )
-    val orchestratorJson: String = jsonMapper.writeValueAsString(orchestratorWithDefaults)
+    val monitoringJson: String = jsonMapper.writeValueAsString(monitoringWithDefaults)
 
     // Jackson deserialises numeric JSON values inside `Map[String, Int]` as
     // boxed `java.lang.Long`. Reading the value through a `Map[String, Int]`
     // view triggers Scala's unbox-to-Int which then fails. Access the raw
     // boxed map via `Any` and coerce explicitly through `Number.intValue`.
-    val rawWorkerCounts: Map[String, Any] =
-      deploymentConfig.workerCounts.asInstanceOf[Map[String, Any]]
-    val defaultWorkerCount: Int =
-      deploymentConfig.workerCountDefault.asInstanceOf[Any].asInstanceOf[Number].intValue
+    val rawTaskParallelism: Map[String, Any] =
+      deploymentConfig.taskParallelism.asInstanceOf[Map[String, Any]]
+    val defaultTaskParallelism: Int =
+      deploymentConfig.taskParallelismDefault.asInstanceOf[Any].asInstanceOf[Number].intValue
 
     val jobs: Map[String, Job] = catalogs.map { catalog =>
       val catalogName = catalog.id.name
-      val workerCount: Int = rawWorkerCounts.get(catalogName) match {
+      val workerCount: Int = rawTaskParallelism.get(catalogName) match {
         case Some(n) => n.asInstanceOf[Number].intValue
-        case None    => defaultWorkerCount
+        case None    => defaultTaskParallelism
       }
       val cfg = CatalogJobConfig(
         jobCluster = buildJobCluster(catalogName),
         schedule = jobSchedules.get(catalogName),
         continuous = jobContinuous.get(catalogName),
         workerCount = workerCount,
-        orchestratorJson = orchestratorJson
+        monitoringJson = monitoringJson
       )
       CatalogWorkflowBuilder.buildJob(catalog, cfg, jarPath, configFilePath)
     }.toMap

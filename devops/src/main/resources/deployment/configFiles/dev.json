@@ -2,21 +2,48 @@
   "deploymentConfig": {
     "host": "https://adb-7405616666691350.10.azuredatabricks.net",
     "volumeCatalog": "dev_lakehouse",
-    "volumeSchema": "uih70837",
-    "targetMode": "development",
+    "volumeSchema": "sp_1043_edap_dev_dbxjob_lakehouse",
+    "targetMode": "production",
     "deploymentAzAuth": "AzureCli",
     "clusterConfiguration": {
       "sparkVersion": "17.3.x-scala2.13",
       "clusterPolicyId": "000AC9F2923A51E1",
-      "maxWorkerNodes": 8,
+      "maxWorkerNodes": 4,
       "nodeTypeId": "Standard_D4ds_v5",
       "driverNodeTypeId": "Standard_D4ds_v5",
       "sparkConf": {
-        "spark.databricks.aggressiveWindowDownS": "300",
-        "spark.sql.shuffle.partitions": "2048",
+        "spark.databricks.queryTagging.enabled": "false",
+        "spark.databricks.aggressiveWindowDownS": "1200",
+        "spark.sql.shuffle.partitions": "200",
         "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
         "spark.sql.autoBroadcastJoinThreshold": "104857600",
-        "spark.sql.adaptive.autoBroadcastJoinThreshold": "104857600"
+        "spark.sql.adaptive.autoBroadcastJoinThreshold": "104857600",
+        "spark.scheduler.mode": "FAIR",
+        "spark.sql.adaptive.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.minPartitionSize": "16MB",
+        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "128MB"
+      }
+    },
+    "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
+    "clusterConfigurations": {
+      "sr": {
+        "_comment": "Dev SR: same shape as prod (8-core D-series, 300GB local SSD) at half the worker count.",
+        "nodeTypeId": "Standard_D8ds_v5",
+        "driverNodeTypeId": "Standard_D8ds_v5",
+        "maxWorkerNodes": 4,
+        "sparkConf": {
+          "spark.sql.shuffle.partitions": "64"
+        }
+      },
+      "dm_md": {
+        "_comment": "Dev DM: same shape as prod (deep+fat) but smaller maxWorkerNodes.",
+        "nodeTypeId": "Standard_E8ds_v5",
+        "driverNodeTypeId": "Standard_D4ds_v5",
+        "maxWorkerNodes": 3,
+        "sparkConf": {
+          "spark.sql.shuffle.partitions": "800"
+        }
       }
     },
     "permissions": [
@@ -38,16 +65,14 @@
       }
     },
     "continuous": {},
-    "workerCountDefault": 4,
-    "workerCounts": {
-      "sr": 8,
+    "taskParallelismDefault": 2,
+    "taskParallelism": {
+      "sr": 12,
       "dm_md": 2
     },
-    "orchestrator": {
+    "monitoring": {
       "idleSleepSeconds": 5,
-      "statusIntervalSeconds": 60,
-      "maxRuntimeSeconds": 7200,
-      "drainTimeoutSeconds": 600
+      "statusIntervalSeconds": 60
     }
   }
 }

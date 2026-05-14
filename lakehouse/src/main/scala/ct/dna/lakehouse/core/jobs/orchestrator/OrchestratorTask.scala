@@ -9,26 +9,21 @@ import ct.dna.utils.runtime.Task
 
 /** Polymorphic Databricks-task descriptor consumed by `CatalogOrchestrator.createInstance`.
   *
-  * The DAG emitted by [[ct.dna.lakehouse.core.CatalogWorkflowBuilder]] has four task kinds with explicit `depends_on` edges:
+  * The DAG emitted by [[ct.dna.lakehouse.core.CatalogWorkflowBuilder]] has three task kinds with explicit `depends_on` edges:
   *
   * {{{
-  *                 ┌── Worker_0 ─────┐
-  *                 ├── Worker_1 ─────┤
-  *   JobSetup ──────┤      …          ├──── Summary (run_if: ALL_DONE)
-  *                 ├── Worker_N ─────┤
-  *                 └── Monitor ──────┘
+  *   JobSetup ──▶ WorkerPool ──▶ Summary (run_if: ALL_DONE)
   * }}}
   *
-  * The `clazz` discriminator distinguishes them on the Databricks task command line. The Monitor reads the live heartbeat directory written by JobSetup and
-  * Workers (see [[HeartbeatStore]]) — it does NOT rely on shared in-JVM state, because each Databricks task runs in its own driver JVM.
+  * The `clazz` discriminator distinguishes them on the Databricks task command line. WorkerPool spawns its worker threads + status reporter in-process and
+  * shares the in-JVM `CatalogOrchestrator` singleton with JobSetup and Summary (all three run in the same driver REPL JVM via `run_as_repl=true`).
   */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "clazz")
 @JsonSubTypes(
   Array(
     new JsonSubTypes.Type(value = classOf[OrchestratorTask.JobSetup], name = "JobSetup"),
-    new JsonSubTypes.Type(value = classOf[OrchestratorTask.Monitor], name = "Monitor"),
     new JsonSubTypes.Type(value = classOf[OrchestratorTask.Summary], name = "Summary"),
-    new JsonSubTypes.Type(value = classOf[OrchestratorTask.Worker], name = "Worker")
+    new JsonSubTypes.Type(value = classOf[OrchestratorTask.WorkerPool], name = "WorkerPool")
   )
 )
 sealed trait OrchestratorTask extends Task {
@@ -65,19 +60,8 @@ object OrchestratorTask {
     override def start(): Unit = JobSetupTaskRunner.run(this)
   }
 
-  /** "Monitor" — long-lived observer. Polls the [[HeartbeatStore]] directory every `statusIntervalSeconds` and emits a consolidated `STATUS` line. Exits when
-    * every Worker has reported `done` or the queue is fully accounted for.
-    */
-  final case class Monitor(
-      runId: String
-  ) extends OrchestratorTask {
-    override def name: String = TaskNames.MonitorTaskKey
-    override def uid: String = s"CatalogOrchestrator-Monitor-$runId"
-    override def start(): Unit = MonitorTaskRunner.run(this)
-  }
-
-  /** "Summary" — terminal task. Runs with `run_if: ALL_DONE` after every Worker has finished, regardless of outcome. Writes the per-run row to the configured
-    * summary Delta table and emits the final SUMMARY log line.
+  /** "Summary" — terminal task. Runs with `run_if: ALL_DONE` after WorkerPool finishes, regardless of outcome. Writes the per-run row to the configured summary
+    * Delta table and emits the final SUMMARY log line.
     */
   final case class Summary(
       runId: String
@@ -87,15 +71,16 @@ object OrchestratorTask {
     override def start(): Unit = SummaryTaskRunner.run(this)
   }
 
-  /** A worker task. Polls the shared queue, runs `TableUpdaterCore.update` on each polled table and reports the outcome back to `CatalogOrchestrator`. `id` is
-    * the numeric worker index; the Databricks `taskKey` is `Worker_$i` via [[TaskNames.workerName]].
+  /** "WorkerPool" — single Databricks task that runs `poolSize` worker threads in-process and an in-process status reporter that emits the consolidated STATUS
+    * block. One task is enough because every task already shares the same driver-REPL JVM via `run_as_repl`, so the historical `N × Worker_i` fan-out added
+    * Databricks task overhead without buying any parallelism that internal threads couldn't provide.
     */
-  final case class Worker(
-      id: String,
+  final case class WorkerPool(
+      poolSize: Int,
       runId: String
   ) extends OrchestratorTask {
-    override def name: String = TaskNames.workerName(id.toInt)
-    override def uid: String = s"CatalogOrchestrator-Worker-${runId}_$id"
-    override def start(): Unit = WorkerTaskRunner.run(this)
+    override def name: String = TaskNames.WorkerTaskKey
+    override def uid: String = s"CatalogOrchestrator-WorkerPool-$runId"
+    override def start(): Unit = WorkerPoolTaskRunner.run(this)
   }
 }

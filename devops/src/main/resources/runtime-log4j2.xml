@@ -214,6 +214,10 @@
       <AppenderRef ref="publicFile.rolling.rewrite" />
       <AppenderRef ref="console.warn" />
     </Logger>
+    <Logger name="ct.dna.lakehouse.core.jobs.orchestrator.WorkerPoolTaskRunner" level="WARN" additivity="false">
+      <AppenderRef ref="publicFile.rolling.rewrite" />
+      <AppenderRef ref="console.warn" />
+    </Logger>
     <Logger name="ct.dna.utils.runtime" level="DEBUG" additivity="false">
       <AppenderRef ref="publicFile.rolling.rewrite" />
       <AppenderRef ref="console.info" />

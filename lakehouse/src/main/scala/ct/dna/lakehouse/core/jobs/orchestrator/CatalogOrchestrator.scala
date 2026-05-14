@@ -31,8 +31,8 @@ object CatalogOrchestrator extends TaskEntryPoint {
   /** Set by Setup once the `CatalogSpec` has been resolved from its FQCN. Workers don't depend on it; kept for status logging. */
   val catalogSpec: AtomicReference[CatalogSpec] = new AtomicReference[CatalogSpec](null)
 
-  /** Set by Setup once the parsed [[OrchestratorConfig]] is available. */
-  val orchestratorConfig: AtomicReference[OrchestratorConfig] = new AtomicReference[OrchestratorConfig](null)
+  /** Set by Setup once the parsed [[MonitoringConfig]] is available. */
+  val monitoringConfig: AtomicReference[MonitoringConfig] = new AtomicReference[MonitoringConfig](null)
 
   /** The dependency-aware queue. Created at class-load time so workers that race ahead of Setup can already poll (they'll just get empty results). */
   val queue: DagQueue[TableID, TableSpec[Entity]] = DagQueue.empty
@@ -83,6 +83,9 @@ object CatalogOrchestrator extends TaskEntryPoint {
   val skippedTables: java.util.Set[TableID] =
     ConcurrentHashMap.newKeySet[TableID]()
 
+  /** Total number of tables enqueued by JobSetup. Read by the WorkerPool status reporter to render `processed / total`. `0` until JobSetup runs. */
+  val totalTables: java.util.concurrent.atomic.AtomicInteger = new java.util.concurrent.atomic.AtomicInteger(0)
+
   // ---- counters for the status timer ----
 
   private val _completed = new java.util.concurrent.atomic.AtomicInteger(0)
@@ -106,7 +109,7 @@ object CatalogOrchestrator extends TaskEntryPoint {
   // ---- TaskEntryPoint plumbing ----
 
   override def createInstance(args: Array[String]): Task = {
-    require(args.nonEmpty, "First arg must be a JSON OrchestratorTask descriptor (JobSetup, Monitor, Summary or Worker)")
+    require(args.nonEmpty, "First arg must be a JSON OrchestratorTask descriptor (JobSetup, Monitor, Summary, Worker or WorkerPool)")
     val runtimeArgs = args.drop(1)
     val task = mapper.readValue[OrchestratorTask](args(0))
     task.withRuntimeArguments(runtimeArgs)

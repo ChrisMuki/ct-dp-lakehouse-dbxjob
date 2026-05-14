@@ -53,6 +53,6 @@ object TableUpdaterCore extends LoggingTrait {
 
     UpdatedTableProcessor(runId).update(tableSpec, logicVersion)
 
-    logger.info(s"Update completed for $packageName.$tableName (runId=$runId)")
+    logger.debug(s"Update completed for $packageName.$tableName (runId=$runId)")
   }
 }

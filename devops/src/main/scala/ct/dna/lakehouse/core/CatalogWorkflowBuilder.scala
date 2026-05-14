@@ -22,8 +22,8 @@ import ct.dna.utils.logging.LoggingTrait
   * @param workerCount
   *   number of `Worker_$i` tasks emitted alongside the single `Summary` task. All share the same `jobCluster` driver JVM and consume the in-memory `DagQueue`.
   *   Larger values raise driver-side parallelism but also driver memory pressure.
-  * @param orchestratorJson
-  *   raw JSON passed as the `orchestratorConfig` Spark argument to every task; produced by `AssetDirectory.createDatabricksYml`.
+  * @param monitoringJson
+  *   raw JSON passed as the `monitoringConfig` Spark argument to every task; produced by `AssetDirectory.createDatabricksYml`.
   */
 final case class CatalogJobConfig(
     jobCluster: JobCluster,
@@ -33,20 +33,25 @@ final case class CatalogJobConfig(
     maxRetries: Option[Integer] = Some(2),
     minRetryIntervalMillis: Option[Integer] = Some(60000),
     workerCount: Int = 4,
-    orchestratorJson: String = "{}"
+    monitoringJson: String = "{}"
 )
 
 /** Builds a single Databricks Job per `CatalogSpec`.
   *
-  * The job emits four task kinds connected by explicit `depends_on` edges:
+  * The job emits three task kinds connected by explicit `depends_on` edges:
   *
-  *   - one `JobSetup` task that resolves the catalog, builds the dependency plan, enqueues every table and writes the `run.json` heartbeat,
-  *   - N `Worker_$i` tasks that poll the queue, emit per-table START/END lines to their Output tab and overwrite their `worker_<i>.json` heartbeat,
-  *   - one `Monitor` task that reads the heartbeat directory and prints a consolidated `STATUS` line every `statusIntervalSeconds`,
+  * {{{
+  *   JobSetup  ----->  Worker  ----->  Summary (run_if: ALL_DONE)
+  * }}}
+  *
+  *   - one `JobSetup` task that resolves the catalog, builds the dependency plan and enqueues every table,
+  *   - one `Worker` task that spawns `workerCount` internal threads draining the shared `DagQueue` and one in-process status reporter that emits the
+  *     consolidated STATUS block to the same Output tab,
   *   - one terminal `Summary` task with `run_if: ALL_DONE` that appends the per-run row to the configured Delta table and emits the final SUMMARY log line.
   *
-  * All tasks run on the shared `jobCluster` but each Databricks task gets its own driver JVM — cross-task communication therefore goes through Delta
-  * (`lakehouse_runs`, `lakehouse_table_runs`) and the Unity Catalog volume heartbeat directory, NOT through JVM-static state.
+  * Every task runs on the shared `jobCluster` and \u2014 thanks to `run_as_repl=true` on the Spark JAR task descriptor \u2014 inside the same driver REPL JVM,
+  * so the in-JVM `CatalogOrchestrator` singleton genuinely spans tasks. The `lakehouse_runs` / `lakehouse_table_runs` Delta tables hold cross-run persistent
+  * state and remain the integration surface for external dashboards.
   */
 object CatalogWorkflowBuilder extends LoggingTrait {
 
@@ -67,19 +72,19 @@ object CatalogWorkflowBuilder extends LoggingTrait {
 
     val catalogClass = catalogSpec.getClass.getPackage.getName
     logger.info(
-      s"Catalog '${catalogSpec.id.name}': emitting ${TaskNames.SetupTaskKey} + ${config.workerCount} worker(s) + " +
-        s"${TaskNames.MonitorTaskKey} + ${TaskNames.SummaryTaskKey} (catalogClass=$catalogClass)"
+      s"Catalog '${catalogSpec.id.name}': emitting ${TaskNames.SetupTaskKey} -> ${TaskNames.WorkerTaskKey}(poolSize=${config.workerCount}) -> " +
+        s"${TaskNames.SummaryTaskKey} (catalogClass=$catalogClass)"
     )
 
     val library = Library(jar = jarPath)
 
-    /** Common runtime params: every task receives the orchestrator JSON arg as arg(0) and the `configFile` / `orchestratorConfig` properties as positional args
-      * for `ct.dna.utils.runtime.Configuration`.
+    /** Common runtime params: every task receives the monitoring JSON arg as arg(0) and the `configFile` / `monitoringConfig` properties as positional args for
+      * `ct.dna.utils.runtime.Configuration`.
       */
     def runtimeParams(taskJson: String): List[String] = List(
       taskJson,
       s"configFile=$configFilePath",
-      s"orchestratorConfig=${config.orchestratorJson}"
+      s"monitoringConfig=${config.monitoringJson}"
     )
 
     // --- JobSetup: boots the singleton, builds the plan, exits ---
@@ -99,50 +104,28 @@ object CatalogWorkflowBuilder extends LoggingTrait {
 
     val setupDependency = List(DependsRef(taskKey = TaskNames.SetupTaskKey))
 
-    // --- Workers (Worker_0 … Worker_N-1): poll the shared queue ---
-    val workerTasks: List[Task] = Range(0, config.workerCount).toList.map { id =>
-      Task(
-        taskKey = TaskNames.workerName(id),
-        dependsOn = setupDependency,
-        sparkJarTask = Some(
-          SparkJarTask(
-            mainClassName = entryPointClass,
-            parameters = runtimeParams(s"""{"clazz":"Worker","id":"$id","runId":"{{job.run_id}}"}""")
-          )
-        ),
-        jobClusterKey = config.jobCluster.jobClusterKey,
-        libraries = List(library),
-        // Workers don't retry: a worker dying mid-update would leave its DagQueue entry in `Running` and stall the catalog. Letting the whole job fail
-        // surfaces the problem instead of silently re-running everything.
-        maxRetries = None,
-        minRetryIntervalMillis = None
-      )
-    }
-
-    // --- Monitor: long-lived observer reading heartbeat JSON files. Runs in parallel to Workers, exits when the run is complete or maxRuntime hits.
-    val monitorTask = Task(
-      taskKey = TaskNames.MonitorTaskKey,
+    // --- Worker: single task that spawns `workerCount` internal threads + an in-process status reporter ---
+    val workerTask = Task(
+      taskKey = TaskNames.WorkerTaskKey,
       dependsOn = setupDependency,
       sparkJarTask = Some(
         SparkJarTask(
           mainClassName = entryPointClass,
-          parameters = runtimeParams("""{"clazz":"Monitor","runId":"{{job.run_id}}"}""")
+          parameters = runtimeParams(s"""{"clazz":"WorkerPool","poolSize":${config.workerCount},"runId":"{{job.run_id}}"}""")
         )
       ),
       jobClusterKey = config.jobCluster.jobClusterKey,
       libraries = List(library),
+      // No retries: a worker pool dying mid-run would re-execute already-merged tables on retry, which is not idempotent.
       maxRetries = None,
       minRetryIntervalMillis = None
     )
 
-    // --- Summary: terminal observer. Depends on every Worker AND the Monitor so it can only start after the rest of the job is done.
-    // Note: Databricks `run_if: ALL_DONE` (so Summary fires even on failure) is injected post-serialisation in `AssetDirectory.injectSummaryRunIf`, because the
-    // shared `Task` case class doesn't expose that field yet.
-    val summaryDependsOn: List[DependsRef] =
-      DependsRef(taskKey = TaskNames.MonitorTaskKey) :: workerTasks.map(t => DependsRef(taskKey = t.taskKey))
+    // --- Summary: terminal observer. Depends only on Worker now (Monitor task no longer exists).
+    // Databricks `run_if: ALL_DONE` (so Summary fires even on Worker failure) is injected post-serialisation in `AssetDirectory.injectSummaryRunIf`.
     val summaryTask = Task(
       taskKey = TaskNames.SummaryTaskKey,
-      dependsOn = summaryDependsOn,
+      dependsOn = List(DependsRef(taskKey = TaskNames.WorkerTaskKey)),
       sparkJarTask = Some(
         SparkJarTask(
           mainClassName = entryPointClass,
@@ -155,7 +138,7 @@ object CatalogWorkflowBuilder extends LoggingTrait {
       minRetryIntervalMillis = None
     )
 
-    val tasks: List[Task] = jobSetupTask :: workerTasks ::: monitorTask :: summaryTask :: Nil
+    val tasks: List[Task] = List(jobSetupTask, workerTask, summaryTask)
 
     val jobName = calcJobName(catalogSpec)
     jobName -> Job(

@@ -34,6 +34,20 @@
       "driverNodeTypeId": "Standard_D8ds_v5"
     },
 
+    "_comment_clusterConfigurations": "Optional per-catalog cluster overrides on top of clusterConfiguration. Each field is optional; absent fields inherit the global value. sparkConf entries are shallow-merged (per-catalog wins on key collisions).",
+    "clusterConfigurations": {
+      "sr": {
+        "nodeTypeId": "Standard_D4ds_v5",
+        "maxWorkerNodes": 8,
+        "sparkConf": { "spark.sql.shuffle.partitions": "400" }
+      },
+      "dm_md": {
+        "nodeTypeId": "Standard_E8ds_v5",
+        "maxWorkerNodes": 6,
+        "sparkConf": { "spark.sql.shuffle.partitions": "1600" }
+      }
+    },
+
     "_comment_schedules": "Per-catalog cron schedules, keyed by catalog name (e.g. 'sr', 'dm_md'). Catalogs without an entry are unscheduled.",
     "schedules": {
       "sr": {

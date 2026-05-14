@@ -15,7 +15,7 @@ ASSET_PATH="/tmp/devops"
 ROOT_PATH="$SCRIPT_DIR/../"
 JAR_PATH="$SCRIPT_DIR/../lakehouse/target/scala-2.13/lakehouse.jar"
 
-CONFIG_FILE="deployment/configFiles/$STAGE.json"
+CONFIG_FILE="$SCRIPT_DIR/src/main/resources/deployment/configFiles/$STAGE.json"
 set -eu
 
 echo "[info] running sbt tests (excluding devops/ColumnWithNameAccessorTest) and lakehouse/assembly" >&2

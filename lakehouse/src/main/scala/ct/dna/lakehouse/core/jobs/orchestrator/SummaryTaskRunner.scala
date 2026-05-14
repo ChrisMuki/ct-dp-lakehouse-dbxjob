@@ -5,6 +5,7 @@ import java.sql.Timestamp
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
+import ct.dna.lakehouse.core.model.TableID
 import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits._
 import ct.dna.utils.logging.LoggingTrait
@@ -21,7 +22,7 @@ import org.apache.spark.sql.types._
   *
   *   1. Append a per-run row to the configurable summary Delta table (`<summaryCatalog>.<summarySchema>.<summaryTable>`). The catalog and schema default to the
   *      deployment's `volumeCatalog` / `volumeSchema` so no extra Unity Catalog provisioning is required for the typical case. Disabled when
-  *      `OrchestratorConfig.summaryEnabled = false`.
+  *      `MonitoringConfig.summaryEnabled = false`.
   *   1. Emit the stable single-line `SUMMARY` log row consumed by grep / dashboard tooling and re-raise any `JobSetup` error so the task itself fails — giving
   *      operators a single failure surface to alert on.
   *
@@ -55,14 +56,14 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
 
     val parsed = Configuration
       .required("rootDir")
-      .required("orchestratorConfig")
+      .required("monitoringConfig")
       .withSparkConfig
       .build(task.runtimeArgs)
     SparkEnv.ensureInitialized(parsed.getSparkConfig)
 
-    val cfg = Option(CatalogOrchestrator.orchestratorConfig.get()).getOrElse {
+    val cfg = Option(CatalogOrchestrator.monitoringConfig.get()).getOrElse {
       throw new IllegalStateException(
-        "OrchestratorConfig not set — JobSetup must run before Summary. Check the bundle's depends_on edges."
+        "MonitoringConfig not set — JobSetup must run before Summary. Check the bundle's depends_on edges."
       )
     }
     val catalogName = Option(CatalogOrchestrator.catalogSpec.get()).map(_.id.name).getOrElse("<unknown>")
@@ -84,12 +85,54 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
     val startMs = Option(CatalogOrchestrator.runStartMs.get()).map(_.longValue()).getOrElse(nowMs)
     val durationSec = (nowMs - startMs) / 1000L
 
-    val failedTables: String = if (failed > 0) {
-      CatalogOrchestrator.results.asScala.toMap
-        .collect { case (id, TableOutcome.Failed(ex)) => s"$id -> ${ex.getClass.getSimpleName}: ${Option(ex.getMessage).getOrElse("<no message>")}" }
+    val resultsSnapshot = CatalogOrchestrator.results.asScala.toMap
+
+    val updatedEntries: Seq[TableID] = resultsSnapshot.iterator
+      .collect { case (id, TableOutcome.Updated) => id }
+      .toSeq
+      .sortBy(_.toString)
+
+    val failedEntries: Seq[(TableID, Throwable)] = resultsSnapshot.iterator
+      .collect { case (id, TableOutcome.Failed(ex)) =>
+        id -> ex
+      }
+      .toSeq
+      .sortBy { case (id, _) => id.toString }
+
+    val skippedEntries: Seq[(TableID, TableID)] = resultsSnapshot.iterator
+      .collect { case (id, TableOutcome.SkippedByAncestor(anc)) =>
+        id -> anc
+      }
+      .toSeq
+      .sortBy { case (id, _) => id.toString }
+
+    val failedTables: String = if (failedEntries.nonEmpty) {
+      failedEntries
         .take(20)
+        .map { case (id, ex) => s"$id -> ${ex.getClass.getSimpleName}: ${Option(ex.getMessage).getOrElse("<no message>")}" }
         .mkString(" | ")
     } else ""
+
+    // Multi-line, operator-friendly report. Emitted BEFORE the stable single-line SUMMARY so dashboard scrapers still match.
+    logger.info(
+      formatReport(
+        runId = runId,
+        catalogName = catalogName,
+        status = status,
+        startMs = startMs,
+        endMs = nowMs,
+        durationSec = durationSec,
+        total = total,
+        updated = updated,
+        failed = failed,
+        skipped = skipped,
+        remaining = remaining,
+        setupErr = setupErr,
+        updatedEntries = updatedEntries,
+        failedEntries = failedEntries,
+        skippedEntries = skippedEntries
+      )
+    )
 
     // Stable single-line summary — keep field order identical to dashboard scrapers.
     logger.info(
@@ -97,7 +140,6 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
         s"updated=$updated failed=$failed skipped=$skipped queueRemaining=$remaining " +
         s"setupError=${setupErr.map(_.getClass.getSimpleName).getOrElse("none")}"
     )
-    if (failed > 0) logger.error(s"Failed tables (showing first ${math.min(failed, 20)}): $failedTables")
 
     if (cfg.summaryEnabled) {
       writeSummaryRow(
@@ -127,7 +169,7 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
   }
 
   private def writeSummaryRow(
-      cfg: OrchestratorConfig,
+      cfg: MonitoringConfig,
       runId: String,
       catalogName: String,
       startMs: Long,
@@ -196,5 +238,131 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       logger.warn(s"Summary Delta write to $tableFqn failed: ${t.getClass.getSimpleName}: ${t.getMessage} (run outcome already logged above)", t)
     }
     ()
+  }
+
+  // ---- Pretty report ----
+
+  private val MaxFailedListed: Int = 50
+  private val MaxSkippedListed: Int = 50
+  private val MaxPerTableListed: Int = 200
+
+  private def idLabel(id: TableID): String = s"${id.schemaId.catalogId.name}.${id.schemaId.name}.${id.name}"
+
+  /** Build a human-friendly multi-line report. Stable single-line `SUMMARY` is logged separately for scrapers. */
+  private[orchestrator] def formatReport(
+      runId: String,
+      catalogName: String,
+      status: String,
+      startMs: Long,
+      endMs: Long,
+      durationSec: Long,
+      total: Int,
+      updated: Int,
+      failed: Int,
+      skipped: Int,
+      remaining: Int,
+      setupErr: Option[Throwable],
+      updatedEntries: Seq[TableID],
+      failedEntries: Seq[(TableID, Throwable)],
+      skippedEntries: Seq[(TableID, TableID)]
+  ): String = {
+    val tsFmt = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss z")
+    tsFmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+    val startedAt = tsFmt.format(new java.util.Date(startMs))
+    val endedAt = tsFmt.format(new java.util.Date(endMs))
+    val durationHuman = humanDuration(durationSec)
+    val successPctStr =
+      if (total <= 0) "n/a"
+      else f"${(updated.toDouble / total.toDouble) * 100.0}%.1f%%"
+
+    val sb = new StringBuilder
+    sb.append('\n')
+    sb.append("================================================================================\n")
+    sb.append(s"  RUN REPORT  —  catalog=$catalogName  runId=$runId  status=$status\n")
+    sb.append("================================================================================\n")
+    sb.append(f"  Started      : $startedAt%n")
+    sb.append(f"  Ended        : $endedAt%n")
+    sb.append(f"  Duration     : $durationHuman ($durationSec s)%n")
+    sb.append("  --------------------------------------------------------------------------------\n")
+    sb.append(f"  Tables total : $total%6d%n")
+    sb.append(f"    updated    : $updated%6d   ($successPctStr success)%n")
+    sb.append(f"    failed     : $failed%6d%n")
+    sb.append(f"    skipped    : $skipped%6d   (descendant of a failed table)%n")
+    sb.append(f"  Queue remain : $remaining%6d   (not picked up before pool drained)%n")
+    setupErr.foreach { t =>
+      sb.append("  --------------------------------------------------------------------------------\n")
+      sb.append(s"  SETUP ERROR  : ${t.getClass.getName}: ${Option(t.getMessage).getOrElse("<no message>")}\n")
+    }
+
+    if (failedEntries.nonEmpty) {
+      sb.append("  --------------------------------------------------------------------------------\n")
+      sb.append(s"  Failed tables (${failedEntries.size})")
+      if (failedEntries.size > MaxFailedListed) sb.append(s" — showing first $MaxFailedListed")
+      sb.append(":\n")
+
+      val byClass = failedEntries.groupBy { case (_, ex) => ex.getClass.getSimpleName }.toSeq.sortBy { case (_, xs) => -xs.size }
+      byClass.foreach { case (cls, xs) =>
+        sb.append(f"    [$cls%s] ${xs.size}%d%n")
+      }
+
+      sb.append("\n")
+      failedEntries.take(MaxFailedListed).foreach { case (id, ex) =>
+        val msg = Option(ex.getMessage).getOrElse("<no message>")
+        sb.append(s"    - $id\n")
+        sb.append(s"        ${ex.getClass.getSimpleName}: ${oneLine(msg, 240)}\n")
+      }
+      if (failedEntries.size > MaxFailedListed) {
+        sb.append(s"    … ${failedEntries.size - MaxFailedListed} more (see the table_runs Delta table for the full list)\n")
+      }
+    }
+
+    if (skippedEntries.nonEmpty) {
+      sb.append("  --------------------------------------------------------------------------------\n")
+      val byAncestor = skippedEntries.groupBy { case (_, anc) => anc }.toSeq.sortBy { case (_, xs) => -xs.size }
+      sb.append(s"  Skipped (${skippedEntries.size}) — grouped by failed ancestor:\n")
+      byAncestor.take(MaxSkippedListed).foreach { case (anc, xs) =>
+        sb.append(f"    - $anc%s  ⇒ ${xs.size}%d descendant table(s)%n")
+      }
+      if (byAncestor.size > MaxSkippedListed) {
+        sb.append(s"    … ${byAncestor.size - MaxSkippedListed} more ancestor group(s)\n")
+      }
+    }
+
+    // Compact per-table list: one line per table, status prefix. Useful when the catalog is small enough
+    // (< MaxPerTableListed); for larger catalogs we already have the failure/skip sections above and the
+    // full record lives in the table_runs Delta table.
+    val allEntries: Seq[(TableID, String)] =
+      updatedEntries.map(id => id -> "OK") ++
+        failedEntries.map { case (id, _) => id -> "FAIL" } ++
+        skippedEntries.map { case (id, _) => id -> "SKIP" }
+    if (allEntries.nonEmpty && allEntries.size <= MaxPerTableListed) {
+      sb.append("  --------------------------------------------------------------------------------\n")
+      sb.append(s"  Per-table outcomes (${allEntries.size}):\n")
+      val labelWidth = math.min(80, allEntries.iterator.map { case (id, _) => idLabel(id).length }.max)
+      allEntries.sortBy { case (id, _) => idLabel(id) }.foreach { case (id, s) =>
+        sb.append(f"    $s%-4s  ${idLabel(id).padTo(labelWidth, ' ')}%n")
+      }
+    } else if (allEntries.size > MaxPerTableListed) {
+      sb.append("  --------------------------------------------------------------------------------\n")
+      sb.append(s"  Per-table outcomes: ${allEntries.size} entries — list omitted (cap=$MaxPerTableListed); see table_runs Delta for the full record.\n")
+    }
+
+    sb.append("================================================================================")
+    sb.toString
+  }
+
+  private def humanDuration(totalSec: Long): String = {
+    val s = math.max(0L, totalSec)
+    val h = s / 3600L
+    val m = (s % 3600L) / 60L
+    val sec = s % 60L
+    if (h > 0) f"${h}h ${m}%02dm ${sec}%02ds"
+    else if (m > 0) f"${m}m ${sec}%02ds"
+    else f"${sec}s"
+  }
+
+  private def oneLine(s: String, max: Int): String = {
+    val flat = s.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim
+    if (flat.length <= max) flat else flat.take(max - 1) + "…"
   }
 }
