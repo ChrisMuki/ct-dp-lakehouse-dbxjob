@@ -17,6 +17,7 @@ import ct.dna.lakehouse.sr.ct_gbl_p24
 import ct.dna.lakehouse.sr.ct_gbl_p43
 import ct.dna.lakehouse.sr.ct_gbl_p61
 import ct.dna.lakehouse.sr.ct_gbl_p64
+import ct.dna.lakehouse.sr.ct_gbl_p69
 import ct.dna.lakehouse.sr.ct_gbl_p73
 import ct.dna.lakehouse.sr.ct_gbl_p77
 import ct.dna.lakehouse.sr.ct_gbl_p85
@@ -67,6 +68,7 @@ object mara extends TableSpec[DmMara] with Updated.ByOneTransaction {
       ct_gbl_p43.mara,
       ct_gbl_p61.mara,
       ct_gbl_p64.mara,
+      ct_gbl_p69.mara,
       ct_gbl_p73.mara,
       ct_gbl_p77.mara,
       ct_gbl_p85.mara,

@@ -1,0 +1,19 @@
+{
+  "rootDir": "/tmp/lakehouse",
+  "sparkConfig": {
+    "clazz": "RemoteSandbox",
+    "stage": "prod",
+    "schema": "uiXXXXXXX",
+    "workspaceUrl": "adb-7405618773642751.11.azuredatabricks.net",
+    "clusterId": "0331-142042-eqlnxkvl",
+    "azAuth": "AzureCli",
+    "readFromLakehouse": {
+      "sr": {
+        "*": ["*"]
+      },
+      "sr_raw": {
+        "*": ["*"]
+      }
+    }
+  }
+}

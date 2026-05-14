@@ -16,6 +16,7 @@ import ct.dna.lakehouse.sr.ct_gbl_p24
 import ct.dna.lakehouse.sr.ct_gbl_p43
 import ct.dna.lakehouse.sr.ct_gbl_p61
 import ct.dna.lakehouse.sr.ct_gbl_p64
+import ct.dna.lakehouse.sr.ct_gbl_p69
 import ct.dna.lakehouse.sr.ct_gbl_p73
 import ct.dna.lakehouse.sr.ct_gbl_p77
 import ct.dna.lakehouse.sr.ct_gbl_p85
@@ -47,6 +48,7 @@ object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
       ct_gbl_p43.makt,
       ct_gbl_p61.makt,
       ct_gbl_p64.makt,
+      ct_gbl_p69.makt,
       ct_gbl_p73.makt,
       ct_gbl_p77.makt,
       ct_gbl_p85.makt,

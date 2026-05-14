@@ -15,8 +15,8 @@ import ct.dna.lakehouse.dm_md.fin_hawk.{t001 => dm_t001}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t001k => dm_t001k}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t001w => dm_t001w}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.SparkSession
+import ct.dna.lakehouse.sr_raw.mn_gbl_spcustoms.countries_ww
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
 case class DmMdp(
@@ -71,10 +71,8 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       dm_t001w,
       dm_t001k,
       dm_t001,
-      dm_makt
-      // TODO: Uncomment once available in sr_raw
-      // countries_ww,
-      // sap_systems
+      dm_makt,
+      countries_ww
     )
 
   override def executeTransaction(
@@ -98,33 +96,29 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
     val t001kDf = broadcast(changeFeeds(dm_t001k).toDF()).alias("t001k")
     val t001Df = broadcast(changeFeeds(dm_t001).toDF()).alias("t001")
     val maktDf = broadcast(changeFeeds(dm_makt).toDF()).alias("makt")
-    val spark = SparkSession.active
 
-    def sameSchemaTable(sourceFqn: String, tableName: String): String = {
-      val parts = sourceFqn.split("\\.", 3)
-      if (parts.length == 3) s"${parts(0)}.${parts(1)}.$tableName" else tableName
-    }
-
-    def readLookup(sourceFqn: String, fallbackTableName: String): DataFrame = {
-      val fallbackFqn = sameSchemaTable(sourceFqn, fallbackTableName)
-      val sourceDf = if (spark.catalog.tableExists(sourceFqn)) Some(spark.table(sourceFqn)) else None
-      val fallbackDf = if (spark.catalog.tableExists(fallbackFqn)) Some(spark.table(fallbackFqn)) else None
-
-      (sourceDf, fallbackDf) match {
-        case (Some(source), Some(fallback)) => if (source.limit(1).count() > 0) source else fallback
-        case (Some(source), None)           => source
-        case (None, Some(fallback))         => fallback
-        case (None, None) =>
-          throw new IllegalStateException(s"Lookup table not found: $sourceFqn or $fallbackFqn")
-      }
-    }
-
-    // TODO: Uncomment once available in sr_raw
-    // val countriesSourceFqn = SparkEnv.idResolver.asSourceFQN(countries_ww).fqn
-    // val sapSystemsSourceFqn = SparkEnv.idResolver.asSourceFQN(sap_systems).fqn
-
-    // val countriesDf = readLookup(countriesSourceFqn, "countries_ww_fixed").alias("country_ww")
-    // val sapSystemsDf = readLookup(sapSystemsSourceFqn, "sap_systems").alias("sap_systems")
+    // `countries_ww` is a global Loaded reference table whose business PK is
+    // `(_mk_instance, _mk_partition, _mk_file, _lh_id_in_message)` — the same `alpha_2_string`
+    // can legitimately appear in multiple rows (different ingests / files / instances). The
+    // joins below use `alpha_2_string` as the join key, so we must dedupe to one row per
+    // `alpha_2_string` to keep the MERGE source unambiguous (otherwise we hit
+    // `DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE`). We pick the row from the
+    // most recently created file deterministically.
+    val countriesDf = broadcast(
+      changeFeeds(countries_ww)
+        .toDF()
+        .withColumn(
+          "_rn",
+          row_number().over(
+            Window
+              .partitionBy(col("alpha_2_string"))
+              .orderBy(col("_mk_created_at").desc_nulls_last, col("_lh_id_in_message").desc_nulls_last)
+          )
+        )
+        .filter(col("_rn") === 1)
+        .drop("_rn")
+        .select("alpha_2_string", "name_string", "member_of_eu_string")
+    )
 
     val joined = marcDf
       .join(
@@ -169,17 +163,16 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
           col("t001k.bukrs") === col("t001.bukrs"),
         "left"
       )
-      // TODO: Uncomment once available in sr_raw
-      // .join(
-      //   countriesDf.alias("country_ww_werks"),
-      //   col("t001w.land1") === col("country_ww_werks.`alpha_2_string`"),
-      //   "left"
-      // )
-      // .join(
-      //   countriesDf.alias("country_ww_cu"),
-      //   col("t001.land1") === col("country_ww_cu.`alpha_2_string`"),
-      //   "left"
-      // )
+      .join(
+        countriesDf.alias("country_ww_werks"),
+        col("t001w.land1") === col("country_ww_werks.`alpha_2_string`"),
+        "left"
+      )
+      .join(
+        countriesDf.alias("country_ww_cu"),
+        col("t001.land1") === col("country_ww_cu.`alpha_2_string`"),
+        "left"
+      )
       .join(
         maktDf,
         col("marc._mk_system") === col("makt._mk_system") &&
@@ -187,16 +180,6 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
           col("marc.matnr") === col("makt.matnr"),
         "left"
       )
-    // TODO: Uncomment once available in sr_raw
-    // .join(
-    //   sapSystemsDf,
-    //   concat_ws(
-    //     "",
-    //     trim(coalesce(col("marc._mk_system"), lit(""))),
-    //     trim(coalesce(col("marc._mk_instance"), lit("")))
-    //   ) === trim(coalesce(col("sap_systems.sap_source_string"), lit(""))),
-    //   "left"
-    // )
 
     val cleaned = joined
       .withColumn(
@@ -224,7 +207,14 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       .withColumn("hscode_length", length(col("hscode")))
       .withColumn(
         "key_column",
-        concat(col("marc._mk_system"), col("marc._mk_instance"), lit("_"), col("marc.matnr"))
+        concat(
+          col("marc._mk_system"),
+          col("marc._mk_instance"),
+          lit("_"),
+          col("marc.matnr"),
+          lit("_"),
+          col("marc.werks")
+        )
       )
 
     val result = cleaned.select(
@@ -250,7 +240,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       col("mdm.mtart").as("mtart"),
       col("mdm.lvorm").as("lvorm"),
       col("t001w.land1").as("werks_country"),
-      lit(null).cast("string").as("werks_country_name"), // TODO: Replace with col("country_ww_werks.name_string") once available in sr_raw
+      col("country_ww_werks.name_string").as("werks_country_name"),
       col("t001w.name1").as("werks_name"),
       concat_ws(" - ", col("marc.werks"), col("t001w.name1")).as("plant_code_name"),
       col("t001.bukrs").as("company_code"),
@@ -258,9 +248,9 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       col("t001.land1").as("company_country"),
       concat_ws(" - ", col("t001.bukrs"), col("t001.butxt")).as("company_code_name"),
       // TODO: Replace lit(null) columns below with actual sr_raw columns once available
-      lit(null).cast("string").as("cu_country_name"), // col("country_ww_cu.name_string")
-      lit(null).cast("long").as("werks_member_of_eu"), // col("country_ww_werks.member_of_eu_string").cast("long")
-      lit(null).cast("long").as("cu_member_of_eu"), // col("country_ww_cu.member_of_eu_string").cast("long")
+      col("country_ww_cu.name_string").as("cu_country_name"),
+      col("country_ww_werks.member_of_eu_string").cast("long").as("werks_member_of_eu"),
+      col("country_ww_cu.member_of_eu_string").cast("long").as("cu_member_of_eu"),
       lit(null).cast("string").as("sap_source"), // col("sap_systems.sap_source_string")
       lit(null).cast("string").as("sys_name"), // col("sap_systems.sys_name_string")
       lit(null).cast("string").as("ssid"), // col("sap_systems.ssid_string")
@@ -274,7 +264,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
 
   override def validate(): Unit = {
     super.validate()
-    val expected = Set(dm_marc, dm_mdm, dm_mara, dm_t023t, dm_t001w, dm_t001k, dm_t001, dm_makt)
+    val expected = Set(dm_marc, dm_mdm, dm_mara, dm_t023t, dm_t001w, dm_t001k, dm_t001, dm_makt, countries_ww)
     require(
       sourceTableSpecs.toSet == expected,
       s"mdp sourceTableSpecs unexpected: $sourceTableSpecs"

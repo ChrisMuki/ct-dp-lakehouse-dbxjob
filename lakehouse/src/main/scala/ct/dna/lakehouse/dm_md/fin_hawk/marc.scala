@@ -16,6 +16,7 @@ import ct.dna.lakehouse.sr.ct_gbl_p24
 import ct.dna.lakehouse.sr.ct_gbl_p43
 import ct.dna.lakehouse.sr.ct_gbl_p61
 import ct.dna.lakehouse.sr.ct_gbl_p64
+import ct.dna.lakehouse.sr.ct_gbl_p69
 import ct.dna.lakehouse.sr.ct_gbl_p73
 import ct.dna.lakehouse.sr.ct_gbl_p77
 import ct.dna.lakehouse.sr.ct_gbl_p85
@@ -48,6 +49,7 @@ object marc extends TableSpec[DmMarc] with Updated.ByOneTransaction {
       ct_gbl_p43.marc,
       ct_gbl_p61.marc,
       ct_gbl_p64.marc,
+      ct_gbl_p69.marc,
       ct_gbl_p73.marc,
       ct_gbl_p77.marc,
       ct_gbl_p85.marc,

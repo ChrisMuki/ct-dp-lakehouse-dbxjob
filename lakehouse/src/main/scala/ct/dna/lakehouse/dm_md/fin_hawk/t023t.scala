@@ -16,6 +16,7 @@ import ct.dna.lakehouse.sr.ct_gbl_p24
 import ct.dna.lakehouse.sr.ct_gbl_p43
 import ct.dna.lakehouse.sr.ct_gbl_p61
 import ct.dna.lakehouse.sr.ct_gbl_p64
+import ct.dna.lakehouse.sr.ct_gbl_p69
 import ct.dna.lakehouse.sr.ct_gbl_p73
 import ct.dna.lakehouse.sr.ct_gbl_p77
 import ct.dna.lakehouse.sr.ct_gbl_p85
@@ -47,6 +48,7 @@ object t023t extends TableSpec[DmT023T] with Updated.ByOneTransaction {
       ct_gbl_p43.t023t,
       ct_gbl_p61.t023t,
       ct_gbl_p64.t023t,
+      ct_gbl_p69.t023t,
       ct_gbl_p73.t023t,
       ct_gbl_p77.t023t,
       ct_gbl_p85.t023t,
