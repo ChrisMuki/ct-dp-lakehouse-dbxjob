@@ -45,6 +45,11 @@
         "nodeTypeId": "Standard_E8ds_v5",
         "maxWorkerNodes": 6,
         "sparkConf": { "spark.sql.shuffle.partitions": "1600" }
+      },
+      "dw_tx": {
+        "nodeTypeId": "Standard_E8ds_v5",
+        "maxWorkerNodes": 4,
+        "sparkConf": { "spark.sql.shuffle.partitions": "800" }
       }
     },
 
@@ -57,6 +62,11 @@
       },
       "dm_md": {
         "quartzCronExpression": "0 0 4 * * ?",
+        "timezoneId": "UTC",
+        "pauseStatus": "UNPAUSED"
+      },
+      "dw_tx": {
+        "quartzCronExpression": "0 0 3 * * ?",
         "timezoneId": "UTC",
         "pauseStatus": "UNPAUSED"
       }

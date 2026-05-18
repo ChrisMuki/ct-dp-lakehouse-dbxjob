@@ -44,6 +44,15 @@
         "sparkConf": {
           "spark.sql.shuffle.partitions": "800"
         }
+      },
+      "dw_tx": {
+        "_comment": "Dev DW_TX: mirrors dm_md shape until the layer has tables and its own profile can be tuned.",
+        "nodeTypeId": "Standard_E8ds_v5",
+        "driverNodeTypeId": "Standard_D4ds_v5",
+        "maxWorkerNodes": 3,
+        "sparkConf": {
+          "spark.sql.shuffle.partitions": "800"
+        }
       }
     },
     "permissions": [
@@ -62,13 +71,19 @@
         "quartzCronExpression": "0 0 4 * * ?",
         "timezoneId": "UTC",
         "pauseStatus": "PAUSED"
+      },
+      "dw_tx": {
+        "quartzCronExpression": "0 0 3 * * ?",
+        "timezoneId": "UTC",
+        "pauseStatus": "PAUSED"
       }
     },
     "continuous": {},
     "taskParallelismDefault": 2,
     "taskParallelism": {
       "sr": 12,
-      "dm_md": 2
+      "dm_md": 2,
+      "dw_tx": 2
     },
     "monitoring": {
       "idleSleepSeconds": 5,

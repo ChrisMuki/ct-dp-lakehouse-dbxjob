@@ -14,6 +14,7 @@ import ct.dna.lakehouse.core.jobs.orchestrator.TaskNames
 import ct.dna.lakehouse.core.model.CatalogSpec
 import ct.dna.lakehouse.core.runtime.SparkConfig
 import ct.dna.lakehouse.dm_md.{`package` => dmCatalog}
+import ct.dna.lakehouse.dw_tx.{`package` => dwCatalog}
 import ct.dna.lakehouse.sr.{`package` => srCatalog}
 import ct.dna.utils.LocalDir
 import ct.dna.utils.ResourceLoader
@@ -177,7 +178,7 @@ case class AssetDirectory(
     /** Catalogs that should be deployed as one Databricks Job each. Each entry gets its own cluster and an independent (optional) schedule looked up by catalog
       * name in `deploymentConfig.schedules`.
       */
-    val catalogs: List[CatalogSpec] = List(srCatalog, dmCatalog)
+    val catalogs: List[CatalogSpec] = List(srCatalog, dwCatalog, dmCatalog)
 
     // Monitoring runtime config is shared across every catalog job; serialised
     // once and passed verbatim as the `monitoringConfig=<json>` Spark argument.

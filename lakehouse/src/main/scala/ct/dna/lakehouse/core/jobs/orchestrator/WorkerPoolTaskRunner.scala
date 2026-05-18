@@ -345,7 +345,7 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
   }
 
   /** Render the rows under the `Running` header — one line per active worker thread, sorted by thread name so each `task-NN` keeps a stable position across
-    * status blocks. Columns: `<threadName>  <schema.table>  <elapsedSec>s`.
+    * status blocks. Columns: `<threadName> <schema.table> <elapsedSec>s`.
     */
   private def renderWorkerLines(nowMs: Long): Seq[String] = {
     val running = CatalogOrchestrator.runningTables.asScala
