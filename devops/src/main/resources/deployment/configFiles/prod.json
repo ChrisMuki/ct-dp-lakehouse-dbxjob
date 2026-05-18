@@ -65,17 +65,17 @@
       "sr": {
         "quartzCronExpression": "0 0 2 * * ?",
         "timezoneId": "UTC",
-        "pauseStatus": "PAUSED"
+        "pauseStatus": "UNPAUSED"
       },
       "dm_md": {
         "quartzCronExpression": "0 0 4 * * ?",
         "timezoneId": "UTC",
-        "pauseStatus": "PAUSED"
+        "pauseStatus": "UNPAUSED"
       },
       "dw_tx": {
         "quartzCronExpression": "0 0 3 * * ?",
         "timezoneId": "UTC",
-        "pauseStatus": "PAUSED"
+        "pauseStatus": "UNPAUSED"
       }
     },
     "continuous": {},
