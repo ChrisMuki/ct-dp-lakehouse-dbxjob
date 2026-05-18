@@ -136,10 +136,10 @@ OUT = _resource_sibling("MaktTest.xlsx")
 # ---------------------------------------------------------------------------
 SRC_HEADER = [
     "#D_case", "#E_case",
-    "mandt", "matnr", "spras", "maktx", "maktg",
     "_mk_org", "_mk_site", "_mk_system", "_mk_instance", "_mk_partition",
     "_mk_file", "_mk_container", "_mk_account", "_mk_created_at",
     "_lh_id_in_message", "_lh_ingest_warning",
+    "mandt", "matnr", "spras", "maktx", "maktg",
 ]
 
 # Human-readable descriptions of every per-language transition. Written into
@@ -248,11 +248,6 @@ def src_row(matnr, spras, system, maktx, ts, d_case_desc, e_case_desc):
     return [
         d_case_desc, # #D_case  (ignored on read; description of the D transition)
         e_case_desc, # #E_case  (ignored on read; description of the E transition)
-        "100",       # mandt
-        matnr,       # matnr
-        spras,       # spras
-        maktx,       # maktx (None ⇒ NULL cell)
-        None,        # maktg (unused by makt; always NULL)
         ORG,         # _mk_org    = "CT"
         SITE,        # _mk_site   = "GBL"
         system,      # _mk_system
@@ -264,6 +259,11 @@ def src_row(matnr, spras, system, maktx, ts, d_case_desc, e_case_desc):
         ts,          # _mk_created_at
         1,           # _lh_id_in_message
         None,        # _lh_ingest_warning (left empty; see #D_case / #E_case)
+        "100",       # mandt
+        matnr,       # matnr
+        spras,       # spras
+        maktx,       # maktx (None ⇒ NULL cell)
+        None,        # maktg (unused by makt; always NULL)
     ]
 
 
