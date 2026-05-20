@@ -211,7 +211,9 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
           col("marc._mk_system"),
           col("marc._mk_instance"),
           lit("_"),
-          col("marc.matnr")
+          col("marc.matnr"),
+          lit("_"),
+          col("marc.werks")
         )
       )
 
