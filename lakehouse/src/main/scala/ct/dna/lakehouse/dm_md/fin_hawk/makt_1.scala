@@ -26,7 +26,7 @@ import org.apache.spark.sql.Column
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
-case class E_makt(
+case class E_makt_1(
     @PK _mk_system: String,
     @PK _mk_instance: String,
     @PK matnr: String,
@@ -36,7 +36,7 @@ case class E_makt(
     _maktx_e: String
 ) extends Entity
 
-object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
+object makt_1 extends TableSpec[E_makt_1] with Updated.ByOneTransaction {
 
   override def sourceTableSpecs: Seq[TableSpec[Entity]] =
     Seq(
@@ -102,7 +102,7 @@ object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
     val snapshotSystems = changeFeeds
       .collect {
         case (_, feed) if feed.isSnapshot =>
-          feed.toDF().select(C_makt._mk_system).limit(1).collect().map(_.getString(0)).toSet
+          feed.toDF().select(C_makt_1._mk_system).limit(1).collect().map(_.getString(0)).toSet
       }
       .flatten
       .toSet
@@ -112,7 +112,7 @@ object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
       .map { case (_, feed) => pivotByLanguage(feed.lastOfKey(), feed.isSnapshot) }
       .reduce(_.unionByName(_))
 
-    val target = C_makt.withDFAlias("target")
+    val target = C_makt_1.withDFAlias("target")
 
     val source = new {
       val _mk_system = ColumnWithName("_mk_system").withDFAlias("source")
@@ -149,10 +149,10 @@ object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
       /* At least one language still has a value → update with whichever side(s) survive. */
       .whenMatched(newD.isNotNull || newE.isNotNull)
       .update(
-        C_makt.spras -> newSprasValue,
-        C_makt.maktx -> newMaktxValue,
-        C_makt._maktx_d -> newD,
-        C_makt._maktx_e -> newE
+        C_makt_1.spras -> newSprasValue,
+        C_makt_1.maktx -> newMaktxValue,
+        C_makt_1._maktx_d -> newD,
+        C_makt_1._maktx_e -> newE
       )
       /* Both languages gone → row gone. */
       .whenMatched()
@@ -160,13 +160,13 @@ object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
       /* New matnr: insert iff the source carries at least one upsert (i.e. some _maktx_x is non-null). */
       .whenNotMatched(source._value_d.isNotNull || source._value_e.isNotNull)
       .insert(
-        C_makt._mk_system -> source._mk_system,
-        C_makt._mk_instance -> source._mk_instance,
-        C_makt.matnr -> source.matnr,
-        C_makt.spras -> insertSprasValue,
-        C_makt.maktx -> insertMaktxValue,
-        C_makt._maktx_d -> source._value_d,
-        C_makt._maktx_e -> source._value_e
+        C_makt_1._mk_system -> source._mk_system,
+        C_makt_1._mk_instance -> source._mk_instance,
+        C_makt_1.matnr -> source.matnr,
+        C_makt_1.spras -> insertSprasValue,
+        C_makt_1.maktx -> insertMaktxValue,
+        C_makt_1._maktx_d -> source._value_d,
+        C_makt_1._maktx_e -> source._value_e
       )
       /* Snapshot cleanup: target rows from a snapshotted system that are absent from the source
          no longer exist upstream and must be deleted. `isin` over an empty Seq is always false,
@@ -204,7 +204,7 @@ object makt extends TableSpec[E_makt] with Updated.ByOneTransaction {
 import ct.dna.lakehouse.core.model.ColumnWithName
 import ct.dna.lakehouse.core.model.ColumnWithNameAccessor
 
-sealed class C_makt(prefix: String) extends ColumnWithNameAccessor {
+sealed class C_makt_1(prefix: String) extends ColumnWithNameAccessor {
   val _mk_system: ColumnWithName = ColumnWithName(prefix, "_mk_system")
   val _mk_instance: ColumnWithName = ColumnWithName(prefix, "_mk_instance")
   val matnr: ColumnWithName = ColumnWithName(prefix, "matnr")
@@ -214,11 +214,11 @@ sealed class C_makt(prefix: String) extends ColumnWithNameAccessor {
   val _maktx_e: ColumnWithName = ColumnWithName(prefix, "_maktx_e")
 }
 
-object C_makt extends C_makt("") {
-  def withDFAlias(alias: String): C_makt = new C_makt(alias)
-  def withoutDFAlias: C_makt = this
+object C_makt_1 extends C_makt_1("") {
+  def withDFAlias(alias: String): C_makt_1 = new C_makt_1(alias)
+  def withoutDFAlias: C_makt_1 = this
 
   @deprecated("Use withDFAlias instead.", "")
-  def as(alias: String): C_makt = withDFAlias(alias)
+  def as(alias: String): C_makt_1 = withDFAlias(alias)
 }
 // COLUMN ACCESSOR AUTO GENERATED:END

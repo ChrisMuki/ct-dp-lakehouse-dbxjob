@@ -7,7 +7,7 @@ import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.Entity.PK
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.Updated
-import ct.dna.lakehouse.dm_md.fin_hawk.{makt => dm_makt}
+import ct.dna.lakehouse.dm_md.fin_hawk.{makt_1 => dm_makt}
 import ct.dna.lakehouse.dm_md.fin_hawk.{mara => dm_mara}
 import ct.dna.lakehouse.dm_md.fin_hawk.{marc => dm_marc}
 import ct.dna.lakehouse.dm_md.fin_hawk.{mdm => dm_mdm}
@@ -22,7 +22,8 @@ import org.apache.spark.sql.functions._
 case class DmMdp(
     _mk_system: String,
     _mk_instance: String,
-    @PK key_column: String,
+    key_column: String,
+    @PK key_column_werks: String,
     matnr: String,
     maktx: String,
     lvorm_plant: String,
@@ -211,6 +212,15 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
           col("marc._mk_system"),
           col("marc._mk_instance"),
           lit("_"),
+          col("marc.matnr")
+        )
+      )
+      .withColumn(
+        "key_column_werks",
+        concat(
+          col("marc._mk_system"),
+          col("marc._mk_instance"),
+          lit("_"),
           col("marc.matnr"),
           lit("_"),
           col("marc.werks")
@@ -221,6 +231,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       col("marc._mk_system").as("_mk_system"),
       col("marc._mk_instance").as("_mk_instance"),
       col("key_column"),
+      col("key_column_werks"),
       col("marc.matnr").as("matnr"),
       col("makt.maktx").as("maktx"),
       col("marc.lvorm_plant").as("lvorm_plant"),
@@ -281,6 +292,7 @@ sealed class C_mdp(prefix: String) extends ColumnWithNameAccessor {
   val _mk_system: ColumnWithName = ColumnWithName(prefix, "_mk_system")
   val _mk_instance: ColumnWithName = ColumnWithName(prefix, "_mk_instance")
   val key_column: ColumnWithName = ColumnWithName(prefix, "key_column")
+  val key_column_werks: ColumnWithName = ColumnWithName(prefix, "key_column_werks")
   val matnr: ColumnWithName = ColumnWithName(prefix, "matnr")
   val maktx: ColumnWithName = ColumnWithName(prefix, "maktx")
   val lvorm_plant: ColumnWithName = ColumnWithName(prefix, "lvorm_plant")

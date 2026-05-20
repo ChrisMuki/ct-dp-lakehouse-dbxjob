@@ -51,9 +51,9 @@ import org.apache.spark.sql.SparkSession
   *      branches: rows present in the snapshot overwrite the target (a missing language clears the corresponding `_maktx_x`), rows absent from the snapshot are
   *      deleted via `whenNotMatchedBySource` (gated on `_mk_system ∈ snapshotSystems`), and rows under non-snapshot systems (E32) must stay untouched.
   */
-class MaktTest extends TestForTable(makt) {
+class MaktTest extends TestForTable(makt_1) {
 
-  lazy val tdm = TestDataManager("makt", "MaktTest.xlsx", ResourceLoader.withClass(makt.getClass))
+  lazy val tdm = TestDataManager("makt", "MaktTest.xlsx", ResourceLoader.withClass(makt_1.getClass))
 
   lazy val spark: SparkSession = SparkSession.active
 
@@ -63,30 +63,30 @@ class MaktTest extends TestForTable(makt) {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
-    tdm.dropTargetIfExists(makt)
-    makt.sourceTableSpecs.foreach(tdm.dropSourceIfExists)
+    tdm.dropTargetIfExists(makt_1)
+    makt_1.sourceTableSpecs.foreach(tdm.dropSourceIfExists)
 
-    tdm.createAsTarget(makt)
-    makt.sourceTableSpecs.foreach(tdm.createAsSource)
+    tdm.createAsTarget(makt_1)
+    makt_1.sourceTableSpecs.foreach(tdm.createAsSource)
   }
 
   override protected def afterAll(): Unit = try {
-    tdm.dropTargetIfExists(makt)
-    makt.sourceTableSpecs.foreach(tdm.dropSourceIfExists)
+    tdm.dropTargetIfExists(makt_1)
+    makt_1.sourceTableSpecs.foreach(tdm.dropSourceIfExists)
   } finally super.afterAll()
 
   behavior of "makt"
 
   it should "validateToRoot" in {
-    makt.validateToRoot()
+    makt_1.validateToRoot()
   }
   // ---------------------------------------------------------------------------
   // Phase 0 — empty everywhere.
   // ---------------------------------------------------------------------------
 
   it should "Phase 0: leave the target empty when every source is empty" in {
-    tdm.update(makt)
-    tdm.assertTargetMatches(makt, "target_phase0")
+    tdm.update(makt_1)
+    tdm.assertTargetMatches(makt_1, "target_phase0")
   }
 
   // ---------------------------------------------------------------------------
@@ -97,9 +97,9 @@ class MaktTest extends TestForTable(makt) {
     tdm.syncToSource(ct_gbl_e32.makt, "e32_phase1")
     tdm.syncToSource(ct_gbl_epp.makt, "epp_phase1")
 
-    tdm.update(makt)
+    tdm.update(makt_1)
 
-    tdm.assertTargetMatches(makt, "target_phase1")
+    tdm.assertTargetMatches(makt_1, "target_phase1")
   }
 
   // ---------------------------------------------------------------------------
@@ -111,9 +111,9 @@ class MaktTest extends TestForTable(makt) {
     // (insert / update / delete per row) drive the production merge branches end-to-end.
     tdm.syncToSource(ct_gbl_e32.makt, "e32_phase2")
 
-    tdm.update(makt)
+    tdm.update(makt_1)
 
-    tdm.assertTargetMatches(makt, "target_phase2")
+    tdm.assertTargetMatches(makt_1, "target_phase2")
   }
 
   // ---------------------------------------------------------------------------
@@ -128,8 +128,8 @@ class MaktTest extends TestForTable(makt) {
     tdm.createAsSource(ct_gbl_epp.makt)
     tdm.syncToSource(ct_gbl_epp.makt, "epp_phase3")
 
-    tdm.update(makt)
+    tdm.update(makt_1)
 
-    tdm.assertTargetMatches(makt, "target_phase3")
+    tdm.assertTargetMatches(makt_1, "target_phase3")
   }
 }

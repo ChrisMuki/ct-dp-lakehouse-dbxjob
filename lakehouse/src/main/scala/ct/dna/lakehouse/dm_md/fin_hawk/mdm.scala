@@ -8,7 +8,7 @@ import ct.dna.lakehouse.core.model.Entity.Decimal
 import ct.dna.lakehouse.core.model.Entity.PK
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.Updated
-import ct.dna.lakehouse.dm_md.fin_hawk.{makt => dm_makt}
+import ct.dna.lakehouse.dm_md.fin_hawk.{makt_1 => dm_makt}
 import ct.dna.lakehouse.dm_md.fin_hawk.{mara => dm_mara}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
 import org.apache.spark.sql.functions._
@@ -65,7 +65,7 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
     if (feeds.forall { case (_, f) => f.isUnchanged }) return Result.NoChanges
 
     val mara_s = C_mara.withDFAlias("mara")
-    val makt_s = C_makt.withDFAlias("makt")
+    val makt_s = C_makt_1.withDFAlias("makt")
     val t023t_s = C_t023t.withDFAlias("t023t")
 
     // Both makt and t023t are small descriptive dimensions relative to mara

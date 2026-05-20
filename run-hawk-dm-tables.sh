@@ -31,7 +31,7 @@ PKG="ct.dna.lakehouse.dm_md.fin_hawk"
 
 # Topologically ordered: leaf tables first, then derived tables.
 TABLES=(
-  makt
+  makt_1
   mara
   marc
   t001
