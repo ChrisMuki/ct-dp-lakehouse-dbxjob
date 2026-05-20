@@ -91,7 +91,7 @@ val countriesDf = broadcast(
                    col("_lh_id_in_message").desc_nulls_last)))
     .filter(col("_rn") === 1)
     .drop("_rn")
-    .select("alpha_2_string", "name_string", "member_of_eu_string"))
+    .select("alpha_2_string", "name_string", "member_of_eu_long"))
 ```
 
 Joined twice with different aliases:

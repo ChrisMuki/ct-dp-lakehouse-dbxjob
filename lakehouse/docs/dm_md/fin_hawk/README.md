@@ -40,7 +40,7 @@ For snapshot feeds, `_changed_x` is forced to `true` so any missing language cle
 
 ### Pattern C — Derived join + `overwriteByKeys` (full recompute)
 
-Used by: [MDM](./MDM_WORKFLOW.md), [MO](./MO_WORKFLOW.md), [MDP](./MDP_WORKFLOW.md).
+Used by: [MDM](./MDM_WORKFLOW.md), [MO](./MO_WORKFLOW.md), [MDP](./MDP_WORKFLOW.md), [COUNTRIES\_WW](./COUNTRIES_WW_WORKFLOW.md).
 
 Reads dm-layer snapshots via `feed.toDF()` (post-merge consistent state), joins them, and writes via `table.overwriteByKeys(result)` which returns `Result.FullRecompute`. No per-row `_change_type` handling — the joined output is the new source of truth for every key it produces.
 

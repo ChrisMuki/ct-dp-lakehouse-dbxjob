@@ -117,7 +117,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
         )
         .filter(col("_rn") === 1)
         .drop("_rn")
-        .select("alpha_2_string", "name_string", "member_of_eu_string")
+        .select("alpha_2_string", "name_string", "member_of_eu_long")
     )
 
     val joined = marcDf
@@ -247,8 +247,8 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       concat_ws(" - ", col("t001.bukrs"), col("t001.butxt")).as("company_code_name"),
       // TODO: Replace lit(null) columns below with actual sr_raw columns once available
       col("country_ww_cu.name_string").as("cu_country_name"),
-      col("country_ww_werks.member_of_eu_string").cast("long").as("werks_member_of_eu"),
-      col("country_ww_cu.member_of_eu_string").cast("long").as("cu_member_of_eu"),
+      col("country_ww_werks.member_of_eu_long").as("werks_member_of_eu"),
+      col("country_ww_cu.member_of_eu_long").as("cu_member_of_eu"),
       lit(null).cast("string").as("sap_source"), // col("sap_systems.sap_source_string")
       lit(null).cast("string").as("sys_name"), // col("sap_systems.sys_name_string")
       lit(null).cast("string").as("ssid"), // col("sap_systems.ssid_string")
