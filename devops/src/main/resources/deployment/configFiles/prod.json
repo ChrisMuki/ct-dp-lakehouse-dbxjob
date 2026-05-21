@@ -22,18 +22,20 @@
         "spark.sql.adaptive.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.minPartitionSize": "16MB",
-        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "128MB"
+        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "128MB",
+        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "512"
       }
     },
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
     "clusterConfigurations": {
       "sr": {
-        "_comment": "Many small SR tables (1:1 from SR_RAW). 8 x D8ds_v5 = 64 cores with 300GB local SSD per node; halves shuffle hops vs. 16 x D4ds_v5 and avoids managed-disk auto-expansion that consistently fires with the 4-core nodes.",
+        "_comment": "Many small SR tables (1:1 from SR_RAW). Up to 16 x D8ds_v5 = 128 cores at max scale; autoscale keeps the cluster idle-small. With taskParallelism.sr=6 each concurrent table gets ~21 cores at max, giving MERGE stages real fan-out without re-introducing over-subscription.",
         "nodeTypeId": "Standard_D8ds_v5",
         "driverNodeTypeId": "Standard_E8ds_v5",
-        "maxWorkerNodes": 8,
+        "maxWorkerNodes": 16,
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "128"
+          "spark.sql.shuffle.partitions": "128",
+          "spark.databricks.delta.merge.materializeSource": "none"
         }
       },
       "dm_md": {
