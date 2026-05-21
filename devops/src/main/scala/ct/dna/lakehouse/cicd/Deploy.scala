@@ -90,7 +90,9 @@ object Deploy extends LoggingTrait {
       val jobResourcesLatestAsBDFS = "dbfs:" + assetDir.jobResourcesLatestPath
       dbxProcess.execute(s"databricks fs mkdir $jobResourcesLatestAsBDFS")
       logger.info(s"Updating latest JAR: $jarPath -> $jobResourcesLatestAsBDFS/lakehouse.jar")
-      dbxProcess.execute(s"databricks fs cp $jarPath $jobResourcesLatestAsBDFS/lakehouse.jar --overwrite").throwOnFailure("Uploading JAR to latest/ path failed.")
+      dbxProcess
+        .execute(s"databricks fs cp $jarPath $jobResourcesLatestAsBDFS/lakehouse.jar --overwrite")
+        .throwOnFailure("Uploading JAR to latest/ path failed.")
 
       val configFilePath = assetDir.assetDir.getAbsolutePath + "/config.json"
       logger.info(s"Updating latest config: $configFilePath -> $jobResourcesLatestAsBDFS/config.json")

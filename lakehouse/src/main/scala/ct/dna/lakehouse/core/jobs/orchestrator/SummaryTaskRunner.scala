@@ -159,7 +159,7 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
         failedTables = if (failedTables.isEmpty) null else failedTables
       )
     } else {
-      logger.info(s"Summary Delta write skipped (summaryEnabled=false)")
+      logger.info("Summary Delta write skipped (summaryEnabled=false)")
     }
 
     // Re-raise a JobSetup error so the Summary task itself fails — gives operators a single failure surface to alert on.

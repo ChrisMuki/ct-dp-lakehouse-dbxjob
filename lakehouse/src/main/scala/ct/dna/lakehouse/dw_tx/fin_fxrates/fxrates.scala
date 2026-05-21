@@ -9,8 +9,8 @@ import ct.dna.lakehouse.core.model.Entity.Decimal
 import ct.dna.lakehouse.core.model.Entity.PK
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.Updated
-import ct.dna.lakehouse.sr.ct_gbl_ghp.{tcurr => src_tcurr, tcurf => src_tcurf}
-
+import ct.dna.lakehouse.sr.ct_gbl_ghp.{tcurf => src_tcurf}
+import ct.dna.lakehouse.sr.ct_gbl_ghp.{tcurr => src_tcurr}
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SparkSession
