@@ -33,7 +33,7 @@
         "driverNodeTypeId": "Standard_D8ds_v5",
         "maxWorkerNodes": 4,
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "64"
+          "spark.sql.shuffle.partitions": "128"
         }
       },
       "dm_md": {
@@ -81,7 +81,7 @@
     "continuous": {},
     "taskParallelismDefault": 2,
     "taskParallelism": {
-      "sr": 12,
+      "sr": 4,
       "dm_md": 2,
       "dw_tx": 2
     },

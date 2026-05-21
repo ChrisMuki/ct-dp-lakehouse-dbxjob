@@ -33,7 +33,7 @@
         "driverNodeTypeId": "Standard_E8ds_v5",
         "maxWorkerNodes": 6,
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "64"
+          "spark.sql.shuffle.partitions": "128"
         }
       },
       "dm_md": {
