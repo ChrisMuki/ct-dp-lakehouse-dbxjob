@@ -34,8 +34,7 @@
         "driverNodeTypeId": "Standard_E16ds_v5",
         "maxWorkerNodes": 8,
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "256",
-          "spark.databricks.delta.merge.materializeSource": "none"
+          "spark.sql.shuffle.partitions": "256"
         }
       },
       "dm_md": {
