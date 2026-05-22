@@ -38,6 +38,7 @@ TABLES=(
   t001k
   t001w
   t023t
+  t134t
   mdm
   mo
   mdp

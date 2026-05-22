@@ -11,6 +11,7 @@ import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.dm_md.fin_hawk.{makt_1 => dm_makt}
 import ct.dna.lakehouse.dm_md.fin_hawk.{mara => dm_mara}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
+import ct.dna.lakehouse.dm_md.fin_hawk.{t134t => dm_t134t}
 import org.apache.spark.sql.functions._
 
 case class DmMdm(
@@ -46,13 +47,15 @@ case class DmMdm(
     spras: String,
     maktx: String,
     spras_t023t: String,
-    wgbez: String
+    wgbez: String,
+    spras_t134t: String,
+    mtbez: String
 ) extends Entity
 
 object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
 
   override def sourceTableSpecs: Seq[TableSpec[Entity]] =
-    Seq(dm_mara, dm_makt, dm_t023t)
+    Seq(dm_mara, dm_makt, dm_t023t, dm_t134t)
 
   override def executeTransaction(
       table: Table,
@@ -67,6 +70,7 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
     val mara_s = C_mara.withDFAlias("mara")
     val makt_s = C_makt_1.withDFAlias("makt")
     val t023t_s = C_t023t.withDFAlias("t023t")
+    val t134t_s = C_t134t.withDFAlias("t134t")
 
     // Both makt and t023t are small descriptive dimensions relative to mara
     // (one row per language per key, only D/E retained after upstream pivot).
@@ -75,6 +79,7 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
     val maraDf = changeFeeds(dm_mara).toDF().alias("mara")
     val maktDf = broadcast(changeFeeds(dm_makt).toDF()).alias("makt")
     val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).toDF()).alias("t134t")
 
     val joined = maraDf
       .join(
@@ -89,6 +94,13 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
         mara_s._mk_instance === t023t_s._mk_instance &&
           mara_s._mk_system === t023t_s._mk_system &&
           mara_s.matkl === t023t_s.matkl,
+        "left"
+      )
+      .join(
+        t134tDf,
+        mara_s._mk_instance === t134t_s._mk_instance &&
+          mara_s._mk_system === t134t_s._mk_system &&
+          mara_s.mtart === t134t_s.mtart,
         "left"
       )
       .select(
@@ -124,7 +136,9 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
         makt_s.spras.as("spras"),
         makt_s.maktx.as("maktx"),
         t023t_s.spras.as("spras_t023t"),
-        t023t_s.wgbez.as("wgbez")
+        t023t_s.wgbez.as("wgbez"),
+        t134t_s.spras.as("spras_t134t"),
+        t134t_s.mtbez.as("mtbez")
       )
 
     table.overwriteByKeys(joined)
@@ -133,7 +147,7 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
   override def validate(): Unit = {
     super.validate()
     require(
-      sourceTableSpecs.toSet == Set(dm_mara, dm_makt, dm_t023t),
+      sourceTableSpecs.toSet == Set(dm_mara, dm_makt, dm_t023t, dm_t134t),
       s"mdm sourceTableSpecs unexpected: $sourceTableSpecs"
     )
   }

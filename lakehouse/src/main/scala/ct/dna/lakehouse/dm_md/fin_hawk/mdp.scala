@@ -15,6 +15,7 @@ import ct.dna.lakehouse.dm_md.fin_hawk.{t001 => dm_t001}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t001k => dm_t001k}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t001w => dm_t001w}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
+import ct.dna.lakehouse.dm_md.fin_hawk.{t134t => dm_t134t}
 import ct.dna.lakehouse.sr_raw.mn_gbl_spcustoms.countries_ww
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -40,6 +41,7 @@ case class DmMdp(
     hscode_length: java.lang.Integer,
     matkl: String,
     wgbez: String,
+    mtbez: String,
     mtart: String,
     lvorm: String,
     werks_country: String,
@@ -69,6 +71,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       dm_mdm,
       dm_mara,
       dm_t023t,
+      dm_t134t,
       dm_t001w,
       dm_t001k,
       dm_t001,
@@ -93,6 +96,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
     // them avoids the per-join shuffle and lets the planner fuse them into a single
     // map-side stage on the marc side.
     val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).toDF()).alias("t134t")
     val t001wDf = broadcast(changeFeeds(dm_t001w).toDF()).alias("t001w")
     val t001kDf = broadcast(changeFeeds(dm_t001k).toDF()).alias("t001k")
     val t001Df = broadcast(changeFeeds(dm_t001).toDF()).alias("t001")
@@ -141,6 +145,13 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
         col("marc._mk_system") === col("t023t._mk_system") &&
           col("marc._mk_instance") === col("t023t._mk_instance") &&
           col("mara.matkl") === col("t023t.matkl"),
+        "left"
+      )
+      .join(
+        t134tDf,
+        col("marc._mk_system") === col("t134t._mk_system") &&
+          col("marc._mk_instance") === col("t134t._mk_instance") &&
+          col("mdm.mtart") === col("t134t.mtart"),
         "left"
       )
       .join(
@@ -248,6 +259,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
       col("hscode_length"),
       col("mara.matkl").as("matkl"),
       col("t023t.wgbez").as("wgbez"),
+      col("t134t.mtbez").as("mtbez"),
       col("mdm.mtart").as("mtart"),
       col("mdm.lvorm").as("lvorm"),
       col("t001w.land1").as("werks_country"),
@@ -275,7 +287,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
 
   override def validate(): Unit = {
     super.validate()
-    val expected = Set(dm_marc, dm_mdm, dm_mara, dm_t023t, dm_t001w, dm_t001k, dm_t001, dm_makt, countries_ww)
+    val expected = Set(dm_marc, dm_mdm, dm_mara, dm_t023t, dm_t134t, dm_t001w, dm_t001k, dm_t001, dm_makt, countries_ww)
     require(
       sourceTableSpecs.toSet == expected,
       s"mdp sourceTableSpecs unexpected: $sourceTableSpecs"

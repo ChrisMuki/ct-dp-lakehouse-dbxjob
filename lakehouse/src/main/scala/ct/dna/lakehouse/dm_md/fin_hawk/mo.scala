@@ -10,6 +10,7 @@ import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.dm_md.fin_hawk.{marc => dm_marc}
 import ct.dna.lakehouse.dm_md.fin_hawk.{mdm => dm_mdm}
 import ct.dna.lakehouse.dm_md.fin_hawk.{t023t => dm_t023t}
+import ct.dna.lakehouse.dm_md.fin_hawk.{t134t => dm_t134t}
 import org.apache.spark.sql.functions._
 
 case class DmMo(
@@ -21,6 +22,7 @@ case class DmMo(
     matkl: String,
     lvorm: String,
     wgbez: String,
+    mtbez: String,
     has_hscode: Boolean,
     number_of_distinct_hscodes: Long
 ) extends Entity
@@ -28,7 +30,7 @@ case class DmMo(
 object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
 
   override def sourceTableSpecs: Seq[TableSpec[Entity]] =
-    Seq(dm_mdm, dm_marc, dm_t023t)
+    Seq(dm_mdm, dm_marc, dm_t023t, dm_t134t)
 
   override def executeTransaction(
       table: Table,
@@ -45,6 +47,7 @@ object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
     // join map-side and let the per-key aggregate run on a single shuffle stage.
     val marcDf = broadcast(changeFeeds(dm_marc).toDF()).alias("marc")
     val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).toDF()).alias("t134t")
 
     val joined = maraDf
       .join(
@@ -61,6 +64,13 @@ object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
           col("mara.matkl") === col("t023t.matkl"),
         "left"
       )
+      .join(
+        t134tDf,
+        col("mara._mk_system") === col("t134t._mk_system") &&
+          col("mara._mk_instance") === col("t134t._mk_instance") &&
+          col("mara.mtart") === col("t134t.mtart"),
+        "left"
+      )
 
     val aggregated = joined
       .groupBy(
@@ -70,7 +80,8 @@ object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
         col("mara.mtart"),
         col("mara.matkl"),
         col("mara.lvorm"),
-        col("t023t.wgbez")
+        col("t023t.wgbez"),
+        col("t134t.mtbez")
       )
       .agg(
         sum(when(col("marc.stawn") =!= "", 1).otherwise(0)).as("hscode_count"),
@@ -95,6 +106,7 @@ object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
       col("mara.matkl").as("matkl"),
       col("mara.lvorm").as("lvorm"),
       col("t023t.wgbez").as("wgbez"),
+      col("t134t.mtbez").as("mtbez"),
       col("has_hscode"),
       col("number_of_distinct_hscodes")
     )
@@ -105,7 +117,7 @@ object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
   override def validate(): Unit = {
     super.validate()
     require(
-      sourceTableSpecs.toSet == Set(dm_mdm, dm_marc, dm_t023t),
+      sourceTableSpecs.toSet == Set(dm_mdm, dm_marc, dm_t023t, dm_t134t),
       s"mo sourceTableSpecs unexpected: $sourceTableSpecs"
     )
   }

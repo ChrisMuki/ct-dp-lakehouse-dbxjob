@@ -22,7 +22,7 @@ The widest fin_hawk denormalised table — one row per **material × plant** wit
 | `hscode` | String | Derived: `stawn_clean` if non-empty, else `steuc_clean` |
 | `hscode_filled` | Boolean | `hscode != ""` |
 | `hscode_length` | Integer | `length(hscode)` |
-| `matkl`, `wgbez`, `mtart`, `lvorm` | String | Material group / type / deletion flag |
+| `matkl`, `wgbez`, `mtart`, `mtbez`, `lvorm` | String | Material group / type / deletion flag |
 | `werks_country`, `werks_country_name`, `werks_name`, `plant_code_name` | String | Plant location |
 | `company_code`, `company_name`, `company_country`, `company_code_name` | String | Company code (via `werks → bwkey → bukrs`) |
 | `cu_country_name` | String | Company-code country name (from `countries_ww`) |
@@ -35,6 +35,7 @@ The widest fin_hawk denormalised table — one row per **material × plant** wit
 - [`dm_mdm`](./MDM_WORKFLOW.md) — material master enrichment.
 - [`dm_mara`](./MARA_WORKFLOW.md) — manufacturer + matkl.
 - [`dm_t023t`](./T023T_WORKFLOW.md) — material-group description.
+- [`dm_t134t`](./T134T_WORKFLOW.md) — material-type description.
 - [`dm_t001w`](./T001W_WORKFLOW.md) — plant master.
 - [`dm_t001k`](./T001K_WORKFLOW.md) — valuation area → company code bridge.
 - [`dm_t001`](./T001_WORKFLOW.md) — company code master.
@@ -64,7 +65,8 @@ flowchart LR
     mdm --> J1[Join on system+instance+matnr]
     J1 --> J2[Join mara on system+instance+matnr]
     J2 --> J3[Join t023t on system+instance+matkl]
-    J3 --> J4[Join t001w on system+instance+werks]
+    J3 --> J3b[Join t134t on mdm.mtart = t134t.mtart]
+    J3b --> J4[Join t001w on system+instance+werks]
     J4 --> J5[Join t001k on t001w bwkey]
     J5 --> J6[Join t001 on t001k bukrs]
     J6 --> J7[Join countries_ww as country_ww_werks<br/>on t001w.land1 = alpha_2_string]
@@ -140,6 +142,7 @@ These will be wired up once the `sap_systems` sr_raw table is published.
 | `dm_mdm` on `(system, instance, matnr)` | ≤1 (mdm is keyed by matnr) | No |
 | `dm_mara` on `(system, instance, matnr)` | ≤1 | No |
 | `dm_t023t` on `(system, instance, matkl)` | ≤1 (D/E pre-pivoted) | No |
+| `dm_t134t` on `mdm.mtart` | ≤1 (D/E pre-pivoted, 1 row per mtart) | No |
 | `dm_t001w` on `(system, instance, werks)` | ≤1 | No |
 | `dm_t001k` on `(system, instance, t001w.bwkey)` | ≤1 | No |
 | `dm_t001` on `(system, instance, t001k.bukrs)` | ≤1 | No |
@@ -152,6 +155,6 @@ Result: each marc row produces exactly one joined row → 1 row per `key_column`
 ## Validation
 
 ```scala
-val expected = Set(dm_marc, dm_mdm, dm_mara, dm_t023t, dm_t001w, dm_t001k, dm_t001, dm_makt, countries_ww)
+val expected = Set(dm_marc, dm_mdm, dm_mara, dm_t023t, dm_t134t, dm_t001w, dm_t001k, dm_t001, dm_makt, countries_ww)
 require(sourceTableSpecs.toSet == expected, ...)
 ```

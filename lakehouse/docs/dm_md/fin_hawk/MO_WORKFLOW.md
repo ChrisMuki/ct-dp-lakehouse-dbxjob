@@ -20,6 +20,7 @@ Computes per-material HS-code coverage statistics. For every `(_mk_system, _mk_i
 | `matkl` | String | Material group (from `dm_mdm`) |
 | `lvorm` | String | Deletion flag at material level (from `dm_mdm`) |
 | `wgbez` | String | Material-group description (from `dm_t023t`) |
+| `mtbez` | String | Material-type description (from `dm_t134t`) |
 | `has_hscode` | Boolean | `true` iff at least one plant row has a non-empty `stawn` |
 | `number_of_distinct_hscodes` | Long | Distinct count of non-empty `stawn` values across plants |
 
@@ -28,6 +29,7 @@ Computes per-material HS-code coverage statistics. For every `(_mk_system, _mk_i
 - [`dm_mdm`](./MDM_WORKFLOW.md) — driving table (1 row per matnr).
 - [`dm_marc`](./MARC_WORKFLOW.md) — plant data per material (N rows per matnr — one per plant).
 - [`dm_t023t`](./T023T_WORKFLOW.md) — material-group descriptions (1 row per matkl).
+- [`dm_t134t`](./T134T_WORKFLOW.md) — material-type descriptions (1 row per mtart).
 
 ## Execution flow
 
@@ -35,10 +37,11 @@ Computes per-material HS-code coverage statistics. For every `(_mk_system, _mk_i
 flowchart TD
     A[executeTransaction] --> B{All feeds isUnchanged?}
     B -- yes --> C[Result.NoChanges]
-    B -- no --> D[mara = changeFeeds dm_mdm .toDF<br/>marc = broadcast dm_marc<br/>t023t = broadcast dm_t023t]
+    B -- no --> D[mara = changeFeeds dm_mdm .toDF<br/>marc = broadcast dm_marc<br/>t023t = broadcast dm_t023t<br/>t134t = broadcast dm_t134t]
     D --> E[mdm LEFT JOIN marc<br/>on _mk_system + _mk_instance + matnr<br/>fan-out: 1 → N plants]
     E --> F[LEFT JOIN t023t<br/>on _mk_system + _mk_instance + matkl]
-    F --> G["groupBy _mk_system, _mk_instance, matnr, mtart, matkl, lvorm, wgbez<br/>agg: hscode_count, distinct_hscode_count"]
+    F --> F2[LEFT JOIN t134t<br/>on _mk_system + _mk_instance + mtart]
+    F2 --> G["groupBy _mk_system, _mk_instance, matnr, mtart, matkl, lvorm, wgbez, mtbez<br/>agg: hscode_count, distinct_hscode_count"]
     G --> H[derive has_hscode + number_of_distinct_hscodes<br/>+ key_column]
     H --> I[table.overwriteByKeys result]
     I --> J[Result.FullRecompute]
@@ -67,11 +70,13 @@ The marc join intentionally fans out — `dm_marc` PK is `(_mk_system, _mk_insta
 
 `dm_t023t` is 1 row per matkl, so it does not multiply rows.
 
+`dm_t134t` is 1 row per mtart, so it does not multiply rows.
+
 ## Notes
 
-- `dm_marc` and `dm_t023t` are broadcast — both small relative to `dm_mdm`, keeping the join + aggregate on a single shuffle.
+- `dm_marc`, `dm_t023t`, and `dm_t134t` are broadcast — all small relative to `dm_mdm`, keeping the join + aggregate on a single shuffle.
 - The variable name `maraDf` in the source code refers to `dm_mdm` (left over from when `mdm` was named `mara`). Functionally still the mdm DataFrame.
 
 ## Validation
 
-`require(sourceTableSpecs.toSet == Set(dm_mdm, dm_marc, dm_t023t))` — guards the source list.
+`require(sourceTableSpecs.toSet == Set(dm_mdm, dm_marc, dm_t023t, dm_t134t))` — guards the source list.
