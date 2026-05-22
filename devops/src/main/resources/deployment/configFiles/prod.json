@@ -29,29 +29,29 @@
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
     "clusterConfigurations": {
       "sr": {
-        "_comment": "Many small SR tables (1:1 from SR_RAW). Up to 16 x D8ds_v5 = 128 cores at max scale; autoscale keeps the cluster idle-small. With taskParallelism.sr=6 each concurrent table gets ~21 cores at max, giving MERGE stages real fan-out without re-introducing over-subscription.",
+        "_comment": "Many small SR tables (1:1 from SR_RAW). 8 x D8ds_v5 = 64 cores at max scale. With taskParallelism.sr=4 each concurrent table gets ~16 cores at max, reducing driver/event pressure while keeping enough MERGE fan-out.",
         "nodeTypeId": "Standard_D8ds_v5",
-        "driverNodeTypeId": "Standard_E8ds_v5",
-        "maxWorkerNodes": 16,
+        "driverNodeTypeId": "Standard_E16ds_v5",
+        "maxWorkerNodes": 8,
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "128",
+          "spark.sql.shuffle.partitions": "256",
           "spark.databricks.delta.merge.materializeSource": "none"
         }
       },
       "dm_md": {
         "_comment": "Few large DM/MD tables. Deep+fat memory-optimized executors; smaller driver since fewer concurrent worker JVMs.",
-        "nodeTypeId": "Standard_E8ds_v5",
-        "driverNodeTypeId": "Standard_D8ds_v5",
-        "maxWorkerNodes": 8,
+        "nodeTypeId": "Standard_E4ds_v5",
+        "driverNodeTypeId": "Standard_D4ds_v5",
+        "maxWorkerNodes": 4,
         "sparkConf": {
           "spark.sql.shuffle.partitions": "800"
         }
       },
       "dw_tx": {
         "_comment": "DW_TX initial profile mirrors dm_md (deep+fat). Tune once the layer has tables and a workload signature.",
-        "nodeTypeId": "Standard_E8ds_v5",
-        "driverNodeTypeId": "Standard_D8ds_v5",
-        "maxWorkerNodes": 8,
+        "nodeTypeId": "Standard_E4ds_v5",
+        "driverNodeTypeId": "Standard_D4ds_v5",
+        "maxWorkerNodes": 4,
         "sparkConf": {
           "spark.sql.shuffle.partitions": "800"
         }
@@ -83,9 +83,9 @@
     "continuous": {},
     "taskParallelismDefault": 4,
     "taskParallelism": {
-      "sr": 6,
-      "dm_md": 2,
-      "dw_tx": 2
+      "sr": 4,
+      "dm_md": 4,
+      "dw_tx": 4
     },
     "monitoring": {
       "idleSleepSeconds": 5,

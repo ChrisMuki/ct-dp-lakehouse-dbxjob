@@ -8,6 +8,7 @@ import scala.util.Try
 import ct.dna.lakehouse.core.model.TableID
 import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits._
+import ct.dna.utils.json.mapper
 import ct.dna.utils.logging.LoggingTrait
 import ct.dna.utils.logging.PrintlnAppender
 import ct.dna.utils.runtime.Configuration
@@ -61,9 +62,12 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       .build(task.runtimeArgs)
     SparkEnv.ensureInitialized(parsed.getSparkConfig)
 
-    val cfg = Option(CatalogOrchestrator.monitoringConfig.get()).getOrElse {
+    val cfg = Option(CatalogOrchestrator.monitoringConfig.get()).orElse {
+      // Fallback for runs where Summary starts in a fresh REPL/JVM and cannot see JobSetup's in-memory singleton state.
+      Try(mapper.readValue[MonitoringConfig](parsed.getProperty("monitoringConfig"))).toOption
+    }.getOrElse {
       throw new IllegalStateException(
-        "MonitoringConfig not set — JobSetup must run before Summary. Check the bundle's depends_on edges."
+        "MonitoringConfig not set — neither CatalogOrchestrator state nor runtime monitoringConfig could be resolved."
       )
     }
     val catalogName = Option(CatalogOrchestrator.catalogSpec.get()).map(_.id.name).getOrElse("<unknown>")
