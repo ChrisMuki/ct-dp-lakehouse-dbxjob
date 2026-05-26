@@ -76,10 +76,10 @@ object mdm extends TableSpec[DmMdm] with Updated.ByOneTransaction {
     // (one row per language per key, only D/E retained after upstream pivot).
     // Broadcasting them turns this into two map-side joins on a single mara
     // shuffle, which is cheaper than a sort-merge join when mara is wide.
-    val maraDf = changeFeeds(dm_mara).toDF().alias("mara")
-    val maktDf = broadcast(changeFeeds(dm_makt).toDF()).alias("makt")
-    val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
-    val t134tDf = broadcast(changeFeeds(dm_t134t).toDF()).alias("t134t")
+    val maraDf = changeFeeds(dm_mara).snapshot().alias("mara")
+    val maktDf = broadcast(changeFeeds(dm_makt).snapshot()).alias("makt")
+    val t023tDf = broadcast(changeFeeds(dm_t023t).snapshot()).alias("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).snapshot()).alias("t134t")
 
     val joined = maraDf
       .join(

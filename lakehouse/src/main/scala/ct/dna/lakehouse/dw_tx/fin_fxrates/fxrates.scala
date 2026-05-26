@@ -229,8 +229,8 @@ object fxrates extends TableSpec[fx_conversion_rates] with Updated.ByOneTransact
 
     if (feeds.forall { case (_, feed) => feed.isUnchanged }) return Result.NoChanges
 
-    val tcurrDf = changeFeeds(src_tcurr).toDF()
-    val tcurfDf = changeFeeds(src_tcurf).toDF()
+    val tcurrDf = changeFeeds(src_tcurr).snapshot()
+    val tcurfDf = changeFeeds(src_tcurf).snapshot()
 
     val ghpTcurr = prepareTcurr(tcurrDf)
       .where(

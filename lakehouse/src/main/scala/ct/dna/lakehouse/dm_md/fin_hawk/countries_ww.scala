@@ -61,7 +61,7 @@ object countries_ww extends TableSpec[DmCountriesWw] with Updated.ByOneTransacti
 
     if (feeds.forall { case (_, f) => f.isUnchanged }) return Result.NoChanges
 
-    val src = changeFeeds(srSource).toDF()
+    val src = changeFeeds(srSource).snapshot()
 
     table.overwriteByKeys(src)
   }

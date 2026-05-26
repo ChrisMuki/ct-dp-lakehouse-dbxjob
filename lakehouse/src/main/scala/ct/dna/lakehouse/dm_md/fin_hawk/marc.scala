@@ -109,13 +109,13 @@ object marc extends TableSpec[DmMarc] with Updated.ByOneTransaction {
         case (_, feed) if feed.isSnapshot =>
           // Project only `_mk_system` instead of every value column — defaulting to all value columns would
           // re-project bad sr-spec columns (see `consumedValueColumnNames` doc above).
-          feed.toDF(Seq("_mk_system")).select(C_marc._mk_system).limit(1).collect().map(_.getString(0)).toSet
+          feed.snapshot(Seq("_mk_system")).select(C_marc._mk_system).limit(1).collect().map(_.getString(0)).toSet
       }
       .flatten
       .toSet
 
     val grouped = feeds
-      .map { case (_, feed) => projectChanges(feed.lastOfKey(consumedValueColumnNames)) }
+      .map { case (_, feed) => projectChanges(feed.lastByKey(consumedValueColumnNames)) }
       .reduce(_.unionByName(_))
 
     val target = C_marc.withDFAlias("target")

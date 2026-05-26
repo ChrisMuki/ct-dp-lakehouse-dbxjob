@@ -89,18 +89,18 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
     // Nothing changed in any source → skip the run entirely.
     if (feeds.forall { case (_, f) => f.isUnchanged }) return Result.NoChanges
 
-    val marcDf = changeFeeds(dm_marc).toDF().alias("marc")
-    val mdmDf = changeFeeds(dm_mdm).toDF().alias("mdm")
-    val maraDf = changeFeeds(dm_mara).toDF().alias("mara")
+    val marcDf = changeFeeds(dm_marc).snapshot().alias("marc")
+    val mdmDf = changeFeeds(dm_mdm).snapshot().alias("mdm")
+    val maraDf = changeFeeds(dm_mara).snapshot().alias("mara")
     // The dimension tables below are small relative to marc/mdm/mara — broadcasting
     // them avoids the per-join shuffle and lets the planner fuse them into a single
     // map-side stage on the marc side.
-    val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
-    val t134tDf = broadcast(changeFeeds(dm_t134t).toDF()).alias("t134t")
-    val t001wDf = broadcast(changeFeeds(dm_t001w).toDF()).alias("t001w")
-    val t001kDf = broadcast(changeFeeds(dm_t001k).toDF()).alias("t001k")
-    val t001Df = broadcast(changeFeeds(dm_t001).toDF()).alias("t001")
-    val maktDf = broadcast(changeFeeds(dm_makt).toDF()).alias("makt")
+    val t023tDf = broadcast(changeFeeds(dm_t023t).snapshot()).alias("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).snapshot()).alias("t134t")
+    val t001wDf = broadcast(changeFeeds(dm_t001w).snapshot()).alias("t001w")
+    val t001kDf = broadcast(changeFeeds(dm_t001k).snapshot()).alias("t001k")
+    val t001Df = broadcast(changeFeeds(dm_t001).snapshot()).alias("t001")
+    val maktDf = broadcast(changeFeeds(dm_makt).snapshot()).alias("makt")
 
     // `countries_ww` is a global Loaded reference table whose business PK is
     // `(_mk_instance, _mk_partition, _mk_file, _lh_id_in_message)` — the same `alpha_2_string`
@@ -111,7 +111,7 @@ object mdp extends TableSpec[DmMdp] with Updated.ByOneTransaction {
     // most recently created file deterministically.
     val countriesDf = broadcast(
       changeFeeds(countries_ww)
-        .toDF()
+        .snapshot()
         .withColumn(
           "_rn",
           row_number().over(

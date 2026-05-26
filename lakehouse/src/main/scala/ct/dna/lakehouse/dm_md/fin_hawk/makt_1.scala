@@ -102,14 +102,14 @@ object makt_1 extends TableSpec[E_makt_1] with Updated.ByOneTransaction {
     val snapshotSystems = changeFeeds
       .collect {
         case (_, feed) if feed.isSnapshot =>
-          feed.toDF().select(C_makt_1._mk_system).limit(1).collect().map(_.getString(0)).toSet
+          feed.snapshot().select(C_makt_1._mk_system).limit(1).collect().map(_.getString(0)).toSet
       }
       .flatten
       .toSet
 
     /** Union of all per-feed pivots. See `pivotByLanguage` for the column contract. */
     val grouped = changeFeeds
-      .map { case (_, feed) => pivotByLanguage(feed.lastOfKey(), feed.isSnapshot) }
+      .map { case (_, feed) => pivotByLanguage(feed.lastByKey(), feed.isSnapshot) }
       .reduce(_.unionByName(_))
 
     val target = C_makt_1.withDFAlias("target")

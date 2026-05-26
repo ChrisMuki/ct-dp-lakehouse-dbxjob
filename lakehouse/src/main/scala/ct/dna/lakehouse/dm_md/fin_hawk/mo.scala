@@ -42,12 +42,12 @@ object mo extends TableSpec[DmMo] with Updated.ByOneTransaction {
     // Nothing changed in any source → skip the run entirely.
     if (feeds.forall { case (_, f) => f.isUnchanged }) return Result.NoChanges
 
-    val maraDf = changeFeeds(dm_mdm).toDF().alias("mara")
+    val maraDf = changeFeeds(dm_mdm).snapshot().alias("mara")
     // marc and t023t are dimensions relative to mdm here — broadcast to keep the
     // join map-side and let the per-key aggregate run on a single shuffle stage.
-    val marcDf = broadcast(changeFeeds(dm_marc).toDF()).alias("marc")
-    val t023tDf = broadcast(changeFeeds(dm_t023t).toDF()).alias("t023t")
-    val t134tDf = broadcast(changeFeeds(dm_t134t).toDF()).alias("t134t")
+    val marcDf = broadcast(changeFeeds(dm_marc).snapshot()).alias("marc")
+    val t023tDf = broadcast(changeFeeds(dm_t023t).snapshot()).alias("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).snapshot()).alias("t134t")
 
     val joined = maraDf
       .join(

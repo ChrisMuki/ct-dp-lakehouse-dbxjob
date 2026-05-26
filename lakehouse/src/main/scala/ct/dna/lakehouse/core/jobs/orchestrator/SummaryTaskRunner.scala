@@ -62,14 +62,16 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       .build(task.runtimeArgs)
     SparkEnv.ensureInitialized(parsed.getSparkConfig)
 
-    val cfg = Option(CatalogOrchestrator.monitoringConfig.get()).orElse {
-      // Fallback for runs where Summary starts in a fresh REPL/JVM and cannot see JobSetup's in-memory singleton state.
-      Try(mapper.readValue[MonitoringConfig](parsed.getProperty("monitoringConfig"))).toOption
-    }.getOrElse {
-      throw new IllegalStateException(
-        "MonitoringConfig not set — neither CatalogOrchestrator state nor runtime monitoringConfig could be resolved."
-      )
-    }
+    val cfg = Option(CatalogOrchestrator.monitoringConfig.get())
+      .orElse {
+        // Fallback for runs where Summary starts in a fresh REPL/JVM and cannot see JobSetup's in-memory singleton state.
+        Try(mapper.readValue[MonitoringConfig](parsed.getProperty("monitoringConfig"))).toOption
+      }
+      .getOrElse {
+        throw new IllegalStateException(
+          "MonitoringConfig not set — neither CatalogOrchestrator state nor runtime monitoringConfig could be resolved."
+        )
+      }
     val catalogName = Option(CatalogOrchestrator.catalogSpec.get()).map(_.id.name).getOrElse("<unknown>")
     val runId = Option(CatalogOrchestrator.runId.get()).getOrElse(task.runId)
 

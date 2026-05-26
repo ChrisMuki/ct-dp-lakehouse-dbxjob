@@ -100,13 +100,13 @@ object t023t extends TableSpec[DmT023T] with Updated.ByOneTransaction {
     val snapshotSystems = changeFeeds
       .collect {
         case (_, feed) if feed.isSnapshot =>
-          feed.toDF().select(C_t023t._mk_system).limit(1).collect().map(_.getString(0)).toSet
+          feed.snapshot().select(C_t023t._mk_system).limit(1).collect().map(_.getString(0)).toSet
       }
       .flatten
       .toSet
 
     val grouped = changeFeeds
-      .map { case (_, feed) => pivotByLanguage(feed.lastOfKey(), feed.isSnapshot) }
+      .map { case (_, feed) => pivotByLanguage(feed.lastByKey(), feed.isSnapshot) }
       .reduce(_.unionByName(_))
 
     val target = C_t023t.withDFAlias("target")
