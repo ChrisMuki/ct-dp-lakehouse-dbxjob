@@ -134,7 +134,10 @@ case class AssetDirectory(
           policyId = effectivePolicyId.orNull,
           workloadType = WorkloadType(clients = WorkloadTypeClients(notebooks = false, jobs = true)),
           dataSecurityMode = "SINGLE_USER",
-          runtimeEngine = "PHOTON",
+          // Photon disabled: the lakehouse jobs are shuffle/IO-bound (Delta merges, large SAP rebuilds)
+          // and gain little from Photon vectorisation while still paying ~2x the DBU rate. Switch back to
+          // "PHOTON" here if a workload profile changes and benchmarks justify the cost.
+          runtimeEngine = "STANDARD",
           kind = "CLASSIC_PREVIEW",
           isSingleNode = false,
           autoscale = Autoscale(minWorkers = 1, maxWorkers = effectiveMaxWorkers)

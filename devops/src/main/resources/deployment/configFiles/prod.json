@@ -29,10 +29,10 @@
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
     "clusterConfigurations": {
       "sr": {
-        "_comment": "Many small SR tables (1:1 from SR_RAW). 8 x D8ds_v5 = 64 cores at max scale. With taskParallelism.sr=4 each concurrent table gets ~16 cores at max, reducing driver/event pressure while keeping enough MERGE fan-out.",
+        "_comment": "Many small SR tables (1:1 from SR_RAW). 12 x D8ds_v5 = 96 cores at max scale. taskParallelism.sr=12 fans tables across the pool; each concurrent table gets ~8 cores at max which still leaves headroom for MERGE shuffles.",
         "nodeTypeId": "Standard_D8ds_v5",
         "driverNodeTypeId": "Standard_E16ds_v5",
-        "maxWorkerNodes": 8,
+        "maxWorkerNodes": 12,
         "sparkConf": {
           "spark.sql.shuffle.partitions": "256"
         }
@@ -82,13 +82,14 @@
     "continuous": {},
     "taskParallelismDefault": 4,
     "taskParallelism": {
-      "sr": 4,
+      "sr": 8,
       "dm_md": 4,
       "dw_tx": 4
     },
     "monitoring": {
       "idleSleepSeconds": 5,
-      "statusIntervalSeconds": 60
+      "statusIntervalSeconds": 60,
+      "maxTableRuntimeSeconds": 600
     }
   }
 }

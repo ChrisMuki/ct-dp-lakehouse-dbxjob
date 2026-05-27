@@ -140,6 +140,10 @@ object DeploymentConfig {
       /** Table name for the per-table results table appended by every Worker. Lives in the same `summaryCatalog`/`summarySchema`. */
       tableRunsTable: String = "lakehouse_table_runs",
       /** When `false`, Workers/Summary skip the per-table Delta writes. */
-      tableRunsEnabled: Boolean = true
+      tableRunsEnabled: Boolean = true,
+      /** Hard cap (seconds) on a single table update before the WorkerPool watchdog cancels its Spark job group. `None` (omit from JSON) disables the watchdog.
+        * Field semantics mirror `MonitoringConfig.maxTableRuntimeSeconds` in the `lakehouse` project.
+        */
+      maxTableRuntimeSeconds: Option[Long] = None
   )
 }

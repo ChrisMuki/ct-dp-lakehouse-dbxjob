@@ -55,8 +55,18 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     val poolSize = math.max(1, task.poolSize)
     val idleSleepMs = cfg.idleSleepSeconds * 1000L
     val statusIntervalMs = math.max(1, cfg.statusIntervalSeconds.toLong) * 1000L
+    val maxTableRuntimeMs: Option[Long] = cfg.maxTableRuntimeSeconds.map(_ * 1000L).filter(_ > 0L)
 
     logger.warn(s"WorkerPool: starting poolSize=$poolSize runId=$runId idleSleep=${idleSleepMs}ms statusInterval=${statusIntervalMs}ms")
+    maxTableRuntimeMs match {
+      case Some(ms) =>
+        logger.warn(
+          s"WorkerPool: per-table watchdog enabled, maxTableRuntimeSeconds=${ms / 1000}. Tables exceeding this are cancelled via " +
+            "`SparkContext.cancelJobGroup` (interruptOnCancel=true) and recorded as TIMED_OUT in lakehouse_table_runs."
+        )
+      case None =>
+        logger.warn("WorkerPool: per-table watchdog disabled (monitoringConfig.maxTableRuntimeSeconds=None).")
+    }
     logger.warn(
       s"WorkerPool: Spark UI tip — each table update sets a Spark job group of the form '$runId/<catalog>.<schema>.<table>'. " +
         "In the Spark UI > Jobs tab, the 'Job Group' / 'Description' column shows that id along with the JVM thread name (`task-NN`), " +
@@ -68,7 +78,7 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     val workerCounters: Array[WorkerCounters] = Array.fill(poolSize)(new WorkerCounters)
 
     val statusStop = new AtomicBoolean(false)
-    val statusThread = startStatusReporter(runId, statusIntervalMs, statusStop)
+    val statusThread = startStatusReporter(runId, statusIntervalMs, maxTableRuntimeMs, statusStop)
 
     val pool = Executors.newFixedThreadPool(poolSize)
     try {
@@ -93,6 +103,13 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
 
       // One last STATUS block so the operator sees the final state in the same tab as everything else.
       logger.warn(formatStatusBlock(runId, finalBlock = true))
+
+      // Top-N slowest tables summary \u2014 reads from the in-memory row buffers so it's always emitted even when
+      // the per-table Delta write is disabled. Useful in two ways:
+      //   1. Quick post-mortem of which tables actually consumed the wall-clock budget.
+      //   2. Input for tuning `maxTableRuntimeSeconds` per layer and for the (future) heavy-tables-first
+      //      scheduling hint \u2014 see comment block below.
+      logger.warn(formatSlowestTablesBlock(allRows, topN = 10))
 
       Option(CatalogOrchestrator.setupError.get()).foreach { t =>
         // Surface a setup error as a task failure so Databricks marks the run as failed. Summary will also re-raise this,
@@ -227,11 +244,28 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
             counters.completed += 1
             (TableRunRow.Status_Updated, None)
           case Failure(ex) =>
-            logger.debug(s"FAIL    $label  ${ex.getClass.getSimpleName}: ${Option(ex.getMessage).getOrElse("<no message>")}", ex)
-            CatalogOrchestrator.recordOutcome(tableId, TableOutcome.Failed(ex))
-            markDescendantsSkipped(tableId)
-            counters.failed += 1
-            (TableRunRow.Status_Failed, Some(ex))
+            // Distinguish a watchdog-induced cancellation from a real failure. The watchdog adds the tableId to
+            // `cancelledForTimeout` *before* calling `cancelJobGroup`, so when the surfaced exception reaches us
+            // we can attribute it correctly even though Spark itself just throws a generic SparkException.
+            val wasTimedOut = CatalogOrchestrator.cancelledForTimeout.remove(tableId)
+            if (wasTimedOut) {
+              val elapsedMs = System.currentTimeMillis() - t0
+              val limitMs = CatalogOrchestrator.monitoringConfig.get().maxTableRuntimeSeconds.map(_ * 1000L).getOrElse(0L)
+              val timeoutEx = new TableTimeoutException(tableId, elapsedMs, limitMs)
+              logger.warn(
+                s"TIMEOUT $label  elapsed=${elapsedMs / 1000}s limit=${limitMs / 1000}s \u2014 cancelled by watchdog; descendants will be skipped"
+              )
+              CatalogOrchestrator.recordOutcome(tableId, TableOutcome.Failed(timeoutEx))
+              markDescendantsSkipped(tableId)
+              counters.failed += 1
+              (TableRunRow.Status_TimedOut, Some(timeoutEx))
+            } else {
+              logger.debug(s"FAIL    $label  ${ex.getClass.getSimpleName}: ${Option(ex.getMessage).getOrElse("<no message>")}", ex)
+              CatalogOrchestrator.recordOutcome(tableId, TableOutcome.Failed(ex))
+              markDescendantsSkipped(tableId)
+              counters.failed += 1
+              (TableRunRow.Status_Failed, Some(ex))
+            }
         }
       } finally {
         CatalogOrchestrator.runningTables.remove(workerKey)
@@ -242,8 +276,14 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
       }
     val t1 = System.currentTimeMillis()
     val durSec = math.max(0L, (t1 - t0) / 1000L)
-    val statusLabel = if (status == TableRunRow.Status_Updated) "OK" else "FAILED"
-    logger.debug(f"DONE    $label%-60s $statusLabel%-7s ${durSec}%4ds")
+    val statusLabel = status match {
+      case TableRunRow.Status_Updated  => "OK"
+      case TableRunRow.Status_TimedOut => "TIMEOUT"
+      case _                           => "FAILED"
+    }
+    // Bumped from debug \u2192 info so per-table durations show up in the task Output tab. With a few thousand
+    // tables this adds a few MB of log per run, which is well within Databricks' driver log limits.
+    logger.info(f"DONE    $label%-60s $statusLabel%-7s ${durSec}%5ds  worker=$workerKey")
     rowBuffer += TableRunRow(
       runId = runId,
       catalog = tableId.schemaId.catalogId.name,
@@ -280,10 +320,22 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
   /** Daemon thread that emits a structured STATUS block to the log every `intervalMs`. Reads directly from in-JVM state \u2014 no file I/O, so it stays
     * accurate even when the UC volume is temporarily unwritable.
     *
+    * Also hosts the per-table **watchdog**: when `maxTableRuntimeMs` is set, every status tick scans
+    * [[CatalogOrchestrator.runningTables]] and for any entry whose elapsed runtime exceeds the limit calls
+    * `SparkContext.cancelJobGroup(runId/<catalog>.<schema>.<table>)`. The job group was installed with
+    * `interruptOnCancel = true` (see `processOne`) so the blocked worker thread receives an exception within
+    * one Spark stage boundary; it then records the table as `TIMED_OUT` via the marker registered in
+    * [[CatalogOrchestrator.cancelledForTimeout]].
+    *
     * Cadence: a short warm-up tick (5s, capped by `intervalMs`) gives operators an early overview as soon as the first tables are picked up, then the reporter
     * settles into the configured `intervalMs`.
     */
-  private def startStatusReporter(runId: String, intervalMs: Long, stop: AtomicBoolean): Thread = {
+  private def startStatusReporter(
+      runId: String,
+      intervalMs: Long,
+      maxTableRuntimeMs: Option[Long],
+      stop: AtomicBoolean
+  ): Thread = {
     val warmupMs = math.min(intervalMs, 5_000L)
     val t = new Thread(
       () => {
@@ -291,10 +343,16 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
           // Warm-up: emit a first STATUS block early so the operator sees plan size, initial running tasks
           // and queue depth without waiting a full `statusInterval`.
           Thread.sleep(warmupMs)
-          if (!stop.get()) logger.warn(formatStatusBlock(runId, finalBlock = false))
+          if (!stop.get()) {
+            logger.warn(formatStatusBlock(runId, finalBlock = false))
+            maxTableRuntimeMs.foreach(enforceTableTimeouts(runId, _))
+          }
           while (!stop.get() && !Thread.currentThread().isInterrupted) {
             Thread.sleep(intervalMs)
-            if (!stop.get()) logger.warn(formatStatusBlock(runId, finalBlock = false))
+            if (!stop.get()) {
+              logger.warn(formatStatusBlock(runId, finalBlock = false))
+              maxTableRuntimeMs.foreach(enforceTableTimeouts(runId, _))
+            }
           }
         } catch { case _: InterruptedException => () }
       },
@@ -303,6 +361,65 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     t.setDaemon(true)
     t.start()
     t
+  }
+
+  /** Cancel the Spark job group of any currently-running table whose elapsed runtime exceeds `limitMs`. The cancellation is best-effort:
+    *   - we mark the table in [[CatalogOrchestrator.cancelledForTimeout]] **before** calling `cancelJobGroup` so the worker thread can attribute the
+    *     surfaced exception correctly,
+    *   - if `cancelJobGroup` throws (e.g. Spark is mid-shutdown) we just log and move on; the next status tick will retry,
+    *   - we never cancel the same table twice (the keyset acts as the dedup guard \u2014 `add` returns `false` if already present).
+    */
+  private def enforceTableTimeouts(runId: String, limitMs: Long): Unit = {
+    val nowMs = System.currentTimeMillis()
+    val sc = Try(SparkSession.active.sparkContext).toOption
+    CatalogOrchestrator.runningTables.asScala.foreach { case (workerKey, (tableId, startMs)) =>
+      val elapsedMs = nowMs - startMs.longValue()
+      if (elapsedMs > limitMs && CatalogOrchestrator.cancelledForTimeout.add(tableId)) {
+        val poolName = s"${tableId.schemaId.catalogId.name}.${tableId.schemaId.name}.${tableId.name}"
+        val jobGroupId = s"$runId/$poolName"
+        logger.warn(
+          s"WATCHDOG cancelling $poolName on $workerKey: elapsed=${elapsedMs / 1000}s > limit=${limitMs / 1000}s (jobGroup=$jobGroupId)"
+        )
+        sc match {
+          case Some(c) =>
+            Try(c.cancelJobGroup(jobGroupId)).failed.foreach { t =>
+              logger.warn(s"WATCHDOG cancelJobGroup($jobGroupId) failed: ${t.getClass.getSimpleName}: ${t.getMessage}")
+            }
+          case None =>
+            logger.warn(s"WATCHDOG no active SparkContext \u2014 cannot cancel $jobGroupId (will retry on next tick)")
+            // Allow a retry on the next tick.
+            CatalogOrchestrator.cancelledForTimeout.remove(tableId)
+        }
+      }
+    }
+  }
+
+  /** Render a "TOP-N slowest tables" block. Reads the in-memory `TableRunRow` buffers \u2014 always emitted, even when `tableRunsEnabled = false`. The data
+    * is intentionally **observational only**: today's scheduler does not consume it to reorder enqueue. A future enhancement (`prioritizeByHistoricalRuntime`)
+    * could read the persisted `lakehouse_table_runs` Delta table at JobSetup time and seed the DAG queue so heavy tables enter the pool earlier (or, if we
+    * want to drain small tables first to preserve progress, later). Until that lands, this block is the easiest input for tuning `maxTableRuntimeSeconds`
+    * per layer.
+    */
+  private[orchestrator] def formatSlowestTablesBlock(rows: Seq[TableRunRow], topN: Int): String = {
+    val sep = "=" * 78
+    val sub = "-" * 78
+    val sb = new StringBuilder
+    sb.append('\n')
+    sb.append(sep).append('\n')
+    sb.append(s"  TOP $topN SLOWEST TABLES (this run, all statuses)").append('\n')
+    sb.append(sub).append('\n')
+    if (rows.isEmpty) {
+      sb.append("  (no tables recorded)").append('\n')
+    } else {
+      val ranked = rows.sortBy(-_.durationSeconds).take(topN)
+      val labelW = ranked.iterator.map(r => s"${r.schema}.${r.table}".length).max
+      ranked.foreach { r =>
+        val label = s"${r.schema}.${r.table}".padTo(labelW, ' ')
+        sb.append(f"  $label  ${r.status}%-9s ${r.durationSeconds}%6ds  worker=${r.workerName}").append('\n')
+      }
+    }
+    sb.append(sep)
+    sb.toString()
   }
 
   /** Render the multi-line STATUS block read entirely from in-JVM state. Plain ASCII delimiters \u2014 stays readable in any log viewer. */
