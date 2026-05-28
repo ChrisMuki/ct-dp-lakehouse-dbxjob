@@ -1,7 +1,7 @@
 import sbt._
 import Keys._
 
-val maxParallelism = math.min(8, math.max(2, java.lang.Runtime.getRuntime.availableProcessors / 4))
+val maxParallelism = math.min(8, java.lang.Runtime.getRuntime.availableProcessors)
 val artifactoryResolver = "Artifactory Realm" at "https://artifacts.ws.contitech.cloud/artifactory/ctdna-sbt"
 
 // -----------------------------------------------------------------------------
@@ -46,5 +46,3 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / concurrentRestrictions :=
   (Global / concurrentRestrictions).value.filterNot(_.toString.contains("forked-test-group")) :+
     Tags.limit(Tags.ForkedTestGroup, maxParallelism)
-
-
