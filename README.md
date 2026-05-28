@@ -77,7 +77,7 @@ dp-lakehouse-dbxjob/
 | `devops` | `lakehouse` | Deployment orchestration, in-memory DAB workflow builder, accessor generator | runnable via `sbt devops/stage` |
 | `almond` | `lakehouse` | Jupyter / Almond notebook playground | classpath file for the Almond kernel |
 
-The SR / SR_RAW model is **not** in this repo — it is consumed as `ct.dna %% lakehouse-sr % 0.6.1`.
+The SR / SR_RAW model is **not** in this repo — it is consumed as `ct.dna %% lakehouse-sr % 0.7.0`.
 
 ## Technology Stack
 
@@ -88,7 +88,7 @@ The SR / SR_RAW model is **not** in this repo — it is consumed as `ct.dna %% l
 | Java | Eclipse Adoptium 17 |
 | Databricks Runtime | 17.3.x (Spark 4.0.0, Delta 4.0.0) |
 | DNA BOM | 4.0.0 |
-| `lakehouse-sr` | 0.6.1 |
+| `lakehouse-sr` | 0.7.0 |
 
 All Spark-runtime library versions (`lakehouse-core`, `dataplatform-core`, `common-utils`, `deploy-utils`, `lakehouse-modelbuilder`, `dbx-runtime`, `local-spark-runtime`) are pinned by the **DNA BOM**, applied via the `useDnaBom` helper in [build.sbt](build.sbt). To change a library version, bump the BOM.
 

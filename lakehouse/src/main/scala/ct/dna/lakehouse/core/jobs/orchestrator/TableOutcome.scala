@@ -22,10 +22,9 @@ object TableOutcome {
   }
 }
 
-/** Marker exception used by the WorkerPool watchdog to signal that a table was cancelled because it exceeded
-  * `MonitoringConfig.maxTableRuntimeSeconds`. Wraps inside a regular [[TableOutcome.Failed]] so existing match
-  * sites keep compiling, but is detected in `WorkerPoolTaskRunner` to write a distinct `TIMED_OUT` status row
-  * to `lakehouse_table_runs` (see [[TableRunRow.Status_TimedOut]]).
+/** Marker exception used by the WorkerPool watchdog to signal that a table was cancelled because it exceeded `MonitoringConfig.maxTableRuntimeSeconds`. Wraps
+  * inside a regular [[TableOutcome.Failed]] so existing match sites keep compiling, but is detected in `WorkerPoolTaskRunner` to write a distinct `TIMED_OUT`
+  * status row to `lakehouse_table_runs` (see [[TableRunRow.Status_TimedOut]]).
   */
 final class TableTimeoutException(val tableId: TableID, val elapsedMs: Long, val limitMs: Long)
     extends RuntimeException(

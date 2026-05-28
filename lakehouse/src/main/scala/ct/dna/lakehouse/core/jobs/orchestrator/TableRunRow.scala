@@ -42,6 +42,7 @@ private[orchestrator] object TableRunRow {
   val Status_Updated: String = "UPDATED"
   val Status_Failed: String = "FAILED"
   val Status_Skipped: String = "SKIPPED"
+
   /** Worker was cancelled by the WorkerPool watchdog after exceeding `MonitoringConfig.maxTableRuntimeSeconds`. */
   val Status_TimedOut: String = "TIMED_OUT"
 

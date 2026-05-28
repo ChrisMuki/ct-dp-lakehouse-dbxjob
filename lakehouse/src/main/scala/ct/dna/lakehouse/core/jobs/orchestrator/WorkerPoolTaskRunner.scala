@@ -320,12 +320,10 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
   /** Daemon thread that emits a structured STATUS block to the log every `intervalMs`. Reads directly from in-JVM state \u2014 no file I/O, so it stays
     * accurate even when the UC volume is temporarily unwritable.
     *
-    * Also hosts the per-table **watchdog**: when `maxTableRuntimeMs` is set, every status tick scans
-    * [[CatalogOrchestrator.runningTables]] and for any entry whose elapsed runtime exceeds the limit calls
-    * `SparkContext.cancelJobGroup(runId/<catalog>.<schema>.<table>)`. The job group was installed with
-    * `interruptOnCancel = true` (see `processOne`) so the blocked worker thread receives an exception within
-    * one Spark stage boundary; it then records the table as `TIMED_OUT` via the marker registered in
-    * [[CatalogOrchestrator.cancelledForTimeout]].
+    * Also hosts the per-table **watchdog**: when `maxTableRuntimeMs` is set, every status tick scans [[CatalogOrchestrator.runningTables]] and for any entry
+    * whose elapsed runtime exceeds the limit calls `SparkContext.cancelJobGroup(runId/<catalog>.<schema>.<table>)`. The job group was installed with
+    * `interruptOnCancel = true` (see `processOne`) so the blocked worker thread receives an exception within one Spark stage boundary; it then records the
+    * table as `TIMED_OUT` via the marker registered in [[CatalogOrchestrator.cancelledForTimeout]].
     *
     * Cadence: a short warm-up tick (5s, capped by `intervalMs`) gives operators an early overview as soon as the first tables are picked up, then the reporter
     * settles into the configured `intervalMs`.
@@ -364,8 +362,8 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
   }
 
   /** Cancel the Spark job group of any currently-running table whose elapsed runtime exceeds `limitMs`. The cancellation is best-effort:
-    *   - we mark the table in [[CatalogOrchestrator.cancelledForTimeout]] **before** calling `cancelJobGroup` so the worker thread can attribute the
-    *     surfaced exception correctly,
+    *   - we mark the table in [[CatalogOrchestrator.cancelledForTimeout]] **before** calling `cancelJobGroup` so the worker thread can attribute the surfaced
+    *     exception correctly,
     *   - if `cancelJobGroup` throws (e.g. Spark is mid-shutdown) we just log and move on; the next status tick will retry,
     *   - we never cancel the same table twice (the keyset acts as the dedup guard \u2014 `add` returns `false` if already present).
     */
@@ -394,11 +392,10 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     }
   }
 
-  /** Render a "TOP-N slowest tables" block. Reads the in-memory `TableRunRow` buffers \u2014 always emitted, even when `tableRunsEnabled = false`. The data
-    * is intentionally **observational only**: today's scheduler does not consume it to reorder enqueue. A future enhancement (`prioritizeByHistoricalRuntime`)
-    * could read the persisted `lakehouse_table_runs` Delta table at JobSetup time and seed the DAG queue so heavy tables enter the pool earlier (or, if we
-    * want to drain small tables first to preserve progress, later). Until that lands, this block is the easiest input for tuning `maxTableRuntimeSeconds`
-    * per layer.
+  /** Render a "TOP-N slowest tables" block. Reads the in-memory `TableRunRow` buffers \u2014 always emitted, even when `tableRunsEnabled = false`. The data is
+    * intentionally **observational only**: today's scheduler does not consume it to reorder enqueue. A future enhancement (`prioritizeByHistoricalRuntime`)
+    * could read the persisted `lakehouse_table_runs` Delta table at JobSetup time and seed the DAG queue so heavy tables enter the pool earlier (or, if we want
+    * to drain small tables first to preserve progress, later). Until that lands, this block is the easiest input for tuning `maxTableRuntimeSeconds` per layer.
     */
   private[orchestrator] def formatSlowestTablesBlock(rows: Seq[TableRunRow], topN: Int): String = {
     val sep = "=" * 78

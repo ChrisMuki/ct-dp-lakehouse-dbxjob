@@ -83,10 +83,9 @@ object CatalogOrchestrator extends TaskEntryPoint {
   val skippedTables: java.util.Set[TableID] =
     ConcurrentHashMap.newKeySet[TableID]()
 
-  /** Set of table-ids the WorkerPool watchdog has just asked Spark to cancel via `cancelJobGroup`. The processing
-    * worker thread observes this set in its `Failure` branch to decide whether the surfaced exception should be
-    * recorded as a regular failure or as a timeout (status `TIMED_OUT` in `lakehouse_table_runs`). Lock-free via
-    * `ConcurrentHashMap.newKeySet`; the worker removes the entry once consumed.
+  /** Set of table-ids the WorkerPool watchdog has just asked Spark to cancel via `cancelJobGroup`. The processing worker thread observes this set in its
+    * `Failure` branch to decide whether the surfaced exception should be recorded as a regular failure or as a timeout (status `TIMED_OUT` in
+    * `lakehouse_table_runs`). Lock-free via `ConcurrentHashMap.newKeySet`; the worker removes the entry once consumed.
     */
   val cancelledForTimeout: java.util.Set[TableID] =
     ConcurrentHashMap.newKeySet[TableID]()
