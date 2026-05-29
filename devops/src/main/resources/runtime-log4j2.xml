@@ -206,6 +206,10 @@
       <AppenderRef ref="publicFile.rolling.rewrite" />
       <AppenderRef ref="console.info" />
     </Logger>
+    <Logger name="ct.dna.lakehouse.core.jobs" level="DEBUG" additivity="false">
+      <AppenderRef ref="publicFile.rolling.rewrite" />
+      <AppenderRef ref="console.info" />
+    </Logger>
     <Logger name="ct.dna.utils.runtime" level="DEBUG" additivity="false">
       <AppenderRef ref="publicFile.rolling.rewrite" />
       <AppenderRef ref="console.info" />
