@@ -28,11 +28,10 @@ object TableUpdaterCore extends LoggingTrait {
     *   FQCN of the schema package (e.g. `ct.dna.lakehouse.sr.ct_gbl_e32`)
     * @param tableName
     *   `TableSpec` object name (matches the Scala `object` identifier)
-    * @param forceRecreate
-    *   if true the table is rebuilt from scratch ("as target")
     */
-  def update(packageName: String, tableName: String, forceRecreate: Boolean = false): Unit = {
+  def update(packageName: String, tableName: String): Unit = {
 
+    // TODO replace with run Id from actual DBX Task + Thread id or so?
     val runId = s"run_${System.currentTimeMillis()}"
 
     val tableSpec = {
@@ -46,10 +45,7 @@ object TableUpdaterCore extends LoggingTrait {
 
     tableSpec.validateToRoot()
 
-    if (forceRecreate)
-      TableManager(runId).createUpdated(tableSpec, asTarget = true)
-    else
-      TableManager(runId).ensureUpdatedTableAsNeeded(tableSpec, asTarget = true)
+    TableManager(runId).reconcileUpdatedTable(tableSpec, asTarget = true)
 
     UpdatedTableProcessor(runId).update(tableSpec, logicVersion)
 

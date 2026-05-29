@@ -26,8 +26,8 @@ final case class MonitoringConfig(
     tableRunsEnabled: Boolean = true,
     /** Hard cap on how long a single table update is allowed to run before the WorkerPool status thread cancels its Spark job group
       * (`runId/<catalog>.<schema>.<table>`). A cancelled table surfaces as a `TIMED_OUT` row in `lakehouse_table_runs` and its descendants are cascade-skipped
-      * just like a normal failure. `None` (default) disables the watchdog and preserves pre-existing behaviour. Recommended starting point per layer:
-      * `sr = 4h`, `dm_md = 1h`, `dw_tx = 1h` — pick ≈3× the historical P95 from the `lakehouse_table_runs` Delta table to avoid false positives.
+      * just like a normal failure. `None` (default) disables the watchdog and preserves pre-existing behaviour. Recommended starting point per layer: `sr =
+      * 4h`, `dm_md = 1h`, `dw_tx = 1h` — pick ≈3× the historical P95 from the `lakehouse_table_runs` Delta table to avoid false positives.
       */
     maxTableRuntimeSeconds: Option[Long] = None
 )
