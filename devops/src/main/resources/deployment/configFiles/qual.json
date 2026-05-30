@@ -13,17 +13,19 @@
       "driverNodeTypeId": "Standard_D4ds_v5",
       "sparkConf": {
         "spark.databricks.queryTagging.enabled": "false",
-        "spark.databricks.aggressiveWindowDownS": "1200",
+        "spark.databricks.aggressiveWindowDownS": "600",
         "spark.sql.shuffle.partitions": "200",
         "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
-        "spark.sql.autoBroadcastJoinThreshold": "104857600",
-        "spark.sql.adaptive.autoBroadcastJoinThreshold": "104857600",
-        "spark.scheduler.mode": "FAIR",
+        "spark.sql.autoBroadcastJoinThreshold": "33554432",
+        "spark.sql.adaptive.autoBroadcastJoinThreshold": "33554432",
         "spark.sql.adaptive.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.minPartitionSize": "16MB",
-        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "128MB",
-        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "512"
+        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "64MB",
+        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "800",
+        "spark.sql.adaptive.skewJoin.enabled": "true",
+        "spark.sql.adaptive.skewJoin.skewedPartitionFactor": "5",
+        "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes": "256MB"
       }
     },
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
