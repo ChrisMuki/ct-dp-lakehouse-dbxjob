@@ -34,6 +34,16 @@ import org.apache.spark.sql.SparkSession
   */
 private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
 
+  /** Single FAIR scheduler pool shared by every worker thread / SparkSession.
+    *
+    * Previously each table installed its own pool (`<catalog>.<schema>.<table>`), which created thousands of one-off
+    * pools Spark had never seen configured — hence the flood of `FairSchedulableBuilder ... pool ... has not been
+    * configured` warnings. Routing all driver threads through one named pool keeps every SparkSession on the same
+    * scheduling lane and silences those warnings, while per-table Spark job groups (below) still provide UI grouping
+    * and watchdog cancellation.
+    */
+  private[orchestrator] val SharedSchedulerPool: String = "lakehouse"
+
   def run(task: OrchestratorTask.WorkerPool): Unit = {
     Thread.currentThread().setName(TaskNames.WorkerTaskKey)
     PrintlnAppender.replaceConsoleAppendersWithPrintlnAppenders()
@@ -224,18 +234,18 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     val t0 = System.currentTimeMillis()
     logger.debug(s"START   $label")
     CatalogOrchestrator.runningTables.put(workerKey, (tableId, java.lang.Long.valueOf(t0)))
-    // Tag every Spark job triggered by this update with a per-table group + a per-table scheduler pool.
-    //   - Job group (UI only):    Spark UI > Jobs tab "Job Group"/"Description" columns.
-    //   - Scheduler pool (FAIR):  Databricks implicitly sets a single pool name = task run id at the task
-    //                             level, so without overriding it every driver thread shares one FIFO pool
-    //                             and FAIR scheduling between tables has no effect. Setting the pool per
-    //                             thread gives each table its own pool, which FAIR rotates across.
-    val poolName = s"${tableId.schemaId.catalogId.name}.$label"
-    val jobGroupId = s"$runId/$poolName"
-    val jobGroupDesc = s"thread=$workerKey table=$poolName"
+    // Tag every Spark job triggered by this update with a per-table group, but route all threads through one
+    // shared scheduler pool.
+    //   - Job group (per table):  Spark UI > Jobs tab "Job Group"/"Description" columns, and the handle the
+    //                             watchdog uses for `cancelJobGroup`. Must stay per-table.
+    //   - Scheduler pool (FAIR):  all worker threads / SparkSessions share `SharedSchedulerPool` so we don't
+    //                             create a fresh, unconfigured pool per table (see SharedSchedulerPool docs).
+    val tableLabel = s"${tableId.schemaId.catalogId.name}.$label"
+    val jobGroupId = s"$runId/$tableLabel"
+    val jobGroupDesc = s"thread=$workerKey table=$tableLabel"
     val sc = Try(SparkSession.active.sparkContext).toOption
     sc.foreach(_.setJobGroup(jobGroupId, jobGroupDesc, interruptOnCancel = true))
-    sc.foreach(_.setLocalProperty("spark.scheduler.pool", poolName))
+    sc.foreach(_.setLocalProperty("spark.scheduler.pool", SharedSchedulerPool))
     val (status, errOpt): (String, Option[Throwable]) =
       try {
         Try(TableUpdaterCore.update(packageName, tableName)) match {
@@ -271,7 +281,6 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
         CatalogOrchestrator.runningTables.remove(workerKey)
         sc.foreach { c =>
           Try(c.clearJobGroup())
-          Try(c.setLocalProperty("spark.scheduler.pool", null))
         }
       }
     val t1 = System.currentTimeMillis()
@@ -373,10 +382,10 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     CatalogOrchestrator.runningTables.asScala.foreach { case (workerKey, (tableId, startMs)) =>
       val elapsedMs = nowMs - startMs.longValue()
       if (elapsedMs > limitMs && CatalogOrchestrator.cancelledForTimeout.add(tableId)) {
-        val poolName = s"${tableId.schemaId.catalogId.name}.${tableId.schemaId.name}.${tableId.name}"
-        val jobGroupId = s"$runId/$poolName"
+        val tableLabel = s"${tableId.schemaId.catalogId.name}.${tableId.schemaId.name}.${tableId.name}"
+        val jobGroupId = s"$runId/$tableLabel"
         logger.warn(
-          s"WATCHDOG cancelling $poolName on $workerKey: elapsed=${elapsedMs / 1000}s > limit=${limitMs / 1000}s (jobGroup=$jobGroupId)"
+          s"WATCHDOG cancelling $tableLabel on $workerKey: elapsed=${elapsedMs / 1000}s > limit=${limitMs / 1000}s (jobGroup=$jobGroupId)"
         )
         sc match {
           case Some(c) =>

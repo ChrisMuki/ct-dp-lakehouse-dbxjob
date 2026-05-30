@@ -13,12 +13,11 @@
       "driverNodeTypeId": "Standard_E8ds_v5",
       "sparkConf": {
         "spark.databricks.queryTagging.enabled": "false",
-        "spark.databricks.aggressiveWindowDownS": "1200",
+        "spark.databricks.aggressiveWindowDownS": "600",
         "spark.sql.shuffle.partitions": "200",
         "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
         "spark.sql.autoBroadcastJoinThreshold": "104857600",
         "spark.sql.adaptive.autoBroadcastJoinThreshold": "104857600",
-        "spark.scheduler.mode": "FAIR",
         "spark.sql.adaptive.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.minPartitionSize": "16MB",
@@ -31,7 +30,7 @@
       "sr": {
         "_comment": "Many small SR tables (1:1 from SR_RAW). 12 x D8ds_v5 = 96 cores at max scale. taskParallelism.sr=12 fans tables across the pool; each concurrent table gets ~8 cores at max which still leaves headroom for MERGE shuffles.",
         "nodeTypeId": "Standard_D8ds_v5",
-        "driverNodeTypeId": "Standard_E16ds_v5",
+        "driverNodeTypeId": "Standard_E8ds_v5",
         "maxWorkerNodes": 12,
         "sparkConf": {
           "spark.sql.shuffle.partitions": "256"
@@ -82,14 +81,14 @@
     "continuous": {},
     "taskParallelismDefault": 4,
     "taskParallelism": {
-      "sr": 8,
+      "sr": 20,
       "dm_md": 4,
       "dw_tx": 4
     },
     "monitoring": {
       "idleSleepSeconds": 5,
       "statusIntervalSeconds": 60,
-      "maxTableRuntimeSeconds": 600
+      "maxTableRuntimeSeconds": 1200
     }
   }
 }
