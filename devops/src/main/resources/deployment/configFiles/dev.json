@@ -8,55 +8,37 @@
     "clusterConfiguration": {
       "sparkVersion": "17.3.x-scala2.13",
       "clusterPolicyId": "000AC9F2923A51E1",
-      "maxWorkerNodes": 4,
-      "nodeTypeId": "Standard_D4ds_v5",
-      "driverNodeTypeId": "Standard_D4ds_v5",
+      "_comment_fixedSize": "Fixed-size cluster: maxWorkerNodes=1 emits autoscale(1,1) -> exactly one worker, no scaling, while still satisfying the policy's SHOULD_USE_AUTOSCALING_INFO requirement. Dev uses one small E8ds_v5 = 8 vCPU / 64 GB RAM with local NVMe SSD, so the Delta (disk) cache is enabled. initialPartitionNum = cores x 4 = 32.",
+      "maxWorkerNodes": 1,
+      "nodeTypeId": "Standard_E8ds_v5",
+      "driverNodeTypeId": "Standard_E8ds_v5",
       "sparkConf": {
-        "spark.databricks.queryTagging.enabled": "false",
-        "spark.databricks.aggressiveWindowDownS": "600",
-        "spark.sql.shuffle.partitions": "200",
-        "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
+        "spark.databricks.io.cache.enabled": "true",
         "spark.sql.autoBroadcastJoinThreshold": "33554432",
         "spark.sql.adaptive.autoBroadcastJoinThreshold": "33554432",
-        "spark.sql.adaptive.enabled": "true",
-        "spark.sql.adaptive.coalescePartitions.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.minPartitionSize": "16MB",
-        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "64MB",
-        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "800",
-        "spark.sql.adaptive.skewJoin.enabled": "true",
-        "spark.sql.adaptive.skewJoin.skewedPartitionFactor": "5",
-        "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes": "256MB"
+        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "32",
+        "spark.sql.objectHashAggregate.sortBased.fallbackThreshold": "4096"
       }
     },
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
     "clusterConfigurations": {
       "sr": {
-        "_comment": "Dev SR: same shape as prod (8-core D-series, 300GB local SSD) at half the worker count.",
-        "nodeTypeId": "Standard_D8ds_v5",
-        "driverNodeTypeId": "Standard_D8ds_v5",
-        "maxWorkerNodes": 4,
+        "_comment": "Dev SR on the single E8ds_v5 worker (fixed size, Delta cache enabled). materializeSource=none keeps small MERGEs cheap.",
+        "maxWorkerNodes": 1,
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "128",
           "spark.databricks.delta.merge.materializeSource": "none"
         }
       },
       "dm_md": {
-        "_comment": "Dev DM: same shape as prod (deep+fat) but smaller maxWorkerNodes.",
-        "nodeTypeId": "Standard_E8ds_v5",
-        "driverNodeTypeId": "Standard_D4ds_v5",
-        "maxWorkerNodes": 3,
-        "sparkConf": {
-          "spark.sql.shuffle.partitions": "800"
-        }
+        "_comment": "Dev DM on the single E8ds_v5 worker (fixed size, Delta cache enabled).",
+        "maxWorkerNodes": 1,
+        "sparkConf": {}
       },
       "dw_tx": {
-        "_comment": "Dev DW_TX: mirrors dm_md shape until the layer has tables and its own profile can be tuned.",
-        "nodeTypeId": "Standard_E8ds_v5",
-        "driverNodeTypeId": "Standard_D4ds_v5",
-        "maxWorkerNodes": 3,
-        "sparkConf": {
-          "spark.sql.shuffle.partitions": "800"
-        }
+        "_comment": "Dev DW_TX on the single E8ds_v5 worker (fixed size, Delta cache enabled). Tune once the layer has tables.",
+        "maxWorkerNodes": 1,
+        "sparkConf": {}
       }
     },
     "permissions": [

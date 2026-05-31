@@ -8,53 +8,42 @@
     "clusterConfiguration": {
       "sparkVersion": "17.3.x-scala2.13",
       "clusterPolicyId": "0009D8E7AF32CDAF",
-      "maxWorkerNodes": 8,
-      "nodeTypeId": "Standard_D4ds_v5",
-      "driverNodeTypeId": "Standard_E8ds_v5",
+      "_comment_fixedSize": "Fixed-size cluster: maxWorkerNodes=1 emits autoscale(1,1) -> exactly one worker, no scaling, while still satisfying the policy's SHOULD_USE_AUTOSCALING_INFO requirement. Global profile sized for the SR job (20 concurrent tables): one E96ds_v5 = 96 vCPU / 672 GB RAM with local NVMe SSD, so the Delta (disk) cache is enabled. initialPartitionNum = cores x 4 = 384.",
+      "maxWorkerNodes": 1,
+      "nodeTypeId": "Standard_E96ds_v5",
+      "driverNodeTypeId": "Standard_E16ds_v5",
       "sparkConf": {
-        "spark.databricks.queryTagging.enabled": "false",
         "spark.databricks.aggressiveWindowDownS": "600",
-        "spark.sql.shuffle.partitions": "200",
-        "spark.databricks.delta.merge.enableLowShuffleMerge": "true",
         "spark.sql.autoBroadcastJoinThreshold": "33554432",
         "spark.sql.adaptive.autoBroadcastJoinThreshold": "33554432",
-        "spark.sql.adaptive.enabled": "true",
-        "spark.sql.adaptive.coalescePartitions.enabled": "true",
         "spark.sql.adaptive.coalescePartitions.minPartitionSize": "16MB",
-        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "64MB",
-        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "800",
-        "spark.sql.adaptive.skewJoin.enabled": "true",
-        "spark.sql.adaptive.skewJoin.skewedPartitionFactor": "5",
-        "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes": "256MB"
+        "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "384",
+        "spark.sql.objectHashAggregate.sortBased.fallbackThreshold": "4096"
       }
     },
     "_comment_clusterConfigurations": "Per-catalog overrides on top of clusterConfiguration. Each field optional; absent fields inherit the global value. sparkConf is shallow-merged (per-catalog wins).",
     "clusterConfigurations": {
       "sr": {
-        "_comment": "Many small SR tables (1:1 from SR_RAW). 12 x D8ds_v5 = 96 cores at max scale. taskParallelism.sr=12 fans tables across the pool; each concurrent table gets ~8 cores at max which still leaves headroom for MERGE shuffles.",
-        "nodeTypeId": "Standard_D8ds_v5",
-        "driverNodeTypeId": "Standard_E8ds_v5",
-        "maxWorkerNodes": 12,
-        "sparkConf": {
-          "spark.sql.shuffle.partitions": "256"
-        }
+        "_comment": "Many small SR tables (1:1 from SR_RAW), 20 concurrent jobs. Inherits the global E96ds_v5 (96 cores) + E16ds_v5 driver and initialPartitionNum=384; taskParallelism.sr fans tables across the 96 cores.",
+        "maxWorkerNodes": 1,
+        "sparkConf": {}
       },
       "dm_md": {
-        "_comment": "Few large DM/MD tables. Deep+fat memory-optimized executors; smaller driver since fewer concurrent worker JVMs.",
-        "nodeTypeId": "Standard_E4ds_v5",
-        "driverNodeTypeId": "Standard_D4ds_v5",
-        "maxWorkerNodes": 4,
+        "_comment": "Few large DM/MD tables, only 4 concurrent jobs, so a smaller worker + driver than SR. E32ds_v5 = 32 cores / 256 GB RAM with local NVMe SSD (Delta cache on); initialPartitionNum = cores x 4 = 128.",
+        "maxWorkerNodes": 1,
+        "nodeTypeId": "Standard_E32ds_v5",
+        "driverNodeTypeId": "Standard_E8ds_v5",
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "800"
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "128"
         }
       },
       "dw_tx": {
-        "_comment": "DW_TX initial profile mirrors dm_md (deep+fat). Tune once the layer has tables and a workload signature.",
-        "nodeTypeId": "Standard_E4ds_v5",
-        "driverNodeTypeId": "Standard_D4ds_v5",
-        "maxWorkerNodes": 4,
+        "_comment": "DW_TX mirrors dm_md (4 concurrent jobs, smaller worker + driver than SR). E32ds_v5 = 32 cores / 256 GB RAM with local NVMe SSD (Delta cache on); initialPartitionNum = cores x 4 = 128. Tune once the layer has a workload signature.",
+        "maxWorkerNodes": 1,
+        "nodeTypeId": "Standard_E32ds_v5",
+        "driverNodeTypeId": "Standard_E8ds_v5",
         "sparkConf": {
-          "spark.sql.shuffle.partitions": "800"
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum": "128"
         }
       }
     },
