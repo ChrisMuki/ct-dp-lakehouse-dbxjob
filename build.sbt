@@ -28,8 +28,8 @@ inThisBuild(
   )
 )
 
-val dnaBomVersion = "4.1.1"
-val lakehouseSrVersion = "0.7.1"
+val dnaBomVersion = "4.2.0"
+val lakehouseSrVersion = "0.8.0"
 
 lazy val lakehouse = project
   .in(file("lakehouse"))

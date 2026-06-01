@@ -1,6 +1,7 @@
 package ct.dna.lakehouse.core.jobs.orchestrator
 
 import ct.dna.lakehouse.core.model.CatalogSpec
+import ct.dna.lakehouse.core.runtime.PoolStrategy
 import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits._
 import ct.dna.utils.json.mapper
@@ -42,6 +43,7 @@ private[orchestrator] object JobSetupTaskRunner extends LoggingTrait {
     CatalogOrchestrator.monitoringConfig.set(monitoringConfig)
 
     SparkEnv.ensureInitialized(parsed.getSparkConfig)
+    SparkEnv.setPoolStrategy(PoolStrategy.Layered("lakehouse"))
 
     val catalogSpec = resolveCatalog(task.catalogClass)
     CatalogOrchestrator.catalogSpec.set(catalogSpec)

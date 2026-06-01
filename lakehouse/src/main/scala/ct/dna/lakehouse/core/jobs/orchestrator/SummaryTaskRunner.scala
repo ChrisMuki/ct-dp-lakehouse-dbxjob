@@ -6,6 +6,7 @@ import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 import ct.dna.lakehouse.core.model.TableID
+import ct.dna.lakehouse.core.runtime.PoolStrategy
 import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits._
 import ct.dna.utils.json.mapper
@@ -61,6 +62,7 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       .withSparkConfig
       .build(task.runtimeArgs)
     SparkEnv.ensureInitialized(parsed.getSparkConfig)
+    SparkEnv.setPoolStrategy(PoolStrategy.Layered("lakehouse"))
 
     val cfg = Option(CatalogOrchestrator.monitoringConfig.get())
       .orElse {

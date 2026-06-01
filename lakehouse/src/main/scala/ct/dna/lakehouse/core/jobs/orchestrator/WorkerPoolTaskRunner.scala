@@ -13,6 +13,7 @@ import scala.util.Try
 import ct.dna.lakehouse.core.model.Entity
 import ct.dna.lakehouse.core.model.TableID
 import ct.dna.lakehouse.core.model.TableSpec
+import ct.dna.lakehouse.core.runtime.PoolStrategy
 import ct.dna.lakehouse.core.runtime.SparkConfig
 import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits._
@@ -36,11 +37,10 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
 
   /** Single FAIR scheduler pool shared by every worker thread / SparkSession.
     *
-    * Previously each table installed its own pool (`<catalog>.<schema>.<table>`), which created thousands of one-off
-    * pools Spark had never seen configured — hence the flood of `FairSchedulableBuilder ... pool ... has not been
-    * configured` warnings. Routing all driver threads through one named pool keeps every SparkSession on the same
-    * scheduling lane and silences those warnings, while per-table Spark job groups (below) still provide UI grouping
-    * and watchdog cancellation.
+    * Previously each table installed its own pool (`<catalog>.<schema>.<table>`), which created thousands of one-off pools Spark had never seen configured —
+    * hence the flood of `FairSchedulableBuilder ... pool ... has not been configured` warnings. Routing all driver threads through one named pool keeps every
+    * SparkSession on the same scheduling lane and silences those warnings, while per-table Spark job groups (below) still provide UI grouping and watchdog
+    * cancellation.
     */
   private[orchestrator] val SharedSchedulerPool: String = "lakehouse"
 
@@ -55,6 +55,7 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
       .build(task.runtimeArgs)
     val sparkConfig = parsed.getSparkConfig
     SparkEnv.ensureInitialized(sparkConfig)
+    SparkEnv.setPoolStrategy(PoolStrategy.Layered("lakehouse"))
 
     val cfg = Option(CatalogOrchestrator.monitoringConfig.get()).getOrElse {
       throw new IllegalStateException(
@@ -152,6 +153,7 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     // must initialize itself — the main thread's ensureInitialized doesn't propagate. The call is synchronized and
     // idempotent: it derives a per-thread session via base.newSession() on first call from this thread.
     SparkEnv.ensureInitialized(sparkConfig)
+    SparkEnv.setPoolStrategy(PoolStrategy.Layered("lakehouse"))
     logger.warn(s"$name polling (idleSleep=${idleSleepMs}ms)")
 
     try {
