@@ -43,10 +43,10 @@ jobs:
           fetch-depth: 0
 
       - name: Prepare runner environment
-        uses: ./.github/actions/runner-config
+        uses: CT-DnA/devops-library/.github/actions/runner-config@v1
 
       - name: Prepare sbt credentials
-        uses: ./.github/actions/sbt-credentials
+        uses: CT-DnA/devops-library/.github/actions/sbt-credentials@v1
         with:
           host: ${{ vars.ARTIFACTORY_HOST }}
           username: ${{ vars.ARTIFACTORY_USER }}
@@ -85,9 +85,7 @@ jobs:
         run: sbt "Test/compile" "lakehouse/test" "lakehouse/assembly" "devops/stage"
 
       - name: Configure git identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+        uses: CT-DnA/devops-library/.github/actions/git-identity@v1
 
       - name: Deploy to ${{ steps.stage.outputs.STAGE }}
         # env:

@@ -39,13 +39,13 @@ jobs:
           fetch-depth: 0
 
       - name: Prepare runner environment
-        uses: ./.github/actions/runner-config
+        uses: CT-DnA/devops-library/.github/actions/runner-config@v1
 
       # sbt needs Artifactory creds to resolve internal `ct.dna.*` deps,
       # but the launcher is invoked with validateOnly=true so the token
       # is never used to publish.
       - name: Prepare sbt credentials
-        uses: ./.github/actions/sbt-credentials
+        uses: CT-DnA/devops-library/.github/actions/sbt-credentials@v1
         with:
           host: ${{ vars.ARTIFACTORY_HOST }}
           username: ${{ vars.ARTIFACTORY_USER }}
