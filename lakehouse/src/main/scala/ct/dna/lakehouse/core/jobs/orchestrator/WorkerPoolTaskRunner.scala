@@ -35,15 +35,6 @@ import org.apache.spark.sql.SparkSession
   */
 private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
 
-  /** Single FAIR scheduler pool shared by every worker thread / SparkSession.
-    *
-    * Previously each table installed its own pool (`<catalog>.<schema>.<table>`), which created thousands of one-off pools Spark had never seen configured —
-    * hence the flood of `FairSchedulableBuilder ... pool ... has not been configured` warnings. Routing all driver threads through one named pool keeps every
-    * SparkSession on the same scheduling lane and silences those warnings, while per-table Spark job groups (below) still provide UI grouping and watchdog
-    * cancellation.
-    */
-  private[orchestrator] val SharedSchedulerPool: String = "lakehouse"
-
   def run(task: OrchestratorTask.WorkerPool): Unit = {
     Thread.currentThread().setName(TaskNames.WorkerTaskKey)
     PrintlnAppender.replaceConsoleAppendersWithPrintlnAppenders()
@@ -236,18 +227,18 @@ private[orchestrator] object WorkerPoolTaskRunner extends LoggingTrait {
     val t0 = System.currentTimeMillis()
     logger.debug(s"START   $label")
     CatalogOrchestrator.runningTables.put(workerKey, (tableId, java.lang.Long.valueOf(t0)))
-    // Tag every Spark job triggered by this update with a per-table group, but route all threads through one
-    // shared scheduler pool.
+    // Tag every Spark job triggered by this update with a per-table group for UI grouping + watchdog cancellation.
     //   - Job group (per table):  Spark UI > Jobs tab "Job Group"/"Description" columns, and the handle the
     //                             watchdog uses for `cancelJobGroup`. Must stay per-table.
-    //   - Scheduler pool (FAIR):  all worker threads / SparkSessions share `SharedSchedulerPool` so we don't
-    //                             create a fresh, unconfigured pool per table (see SharedSchedulerPool docs).
+    //   - Scheduler pool (FAIR):  intentionally NOT set here. The `PoolStrategy.Layered("lakehouse")` installed via
+    //                             SparkEnv.setPoolStrategy owns `spark.scheduler.pool`, routing each table's stage
+    //                             layers to the weighted pools `lakehouse-0..6`. Setting it here would overwrite
+    //                             that with the bare `lakehouse` pool and defeat the layered weighting.
     val tableLabel = s"${tableId.schemaId.catalogId.name}.$label"
     val jobGroupId = s"$runId/$tableLabel"
     val jobGroupDesc = s"thread=$workerKey table=$tableLabel"
     val sc = Try(SparkSession.active.sparkContext).toOption
     sc.foreach(_.setJobGroup(jobGroupId, jobGroupDesc, interruptOnCancel = true))
-    sc.foreach(_.setLocalProperty("spark.scheduler.pool", SharedSchedulerPool))
     val (status, errOpt): (String, Option[Throwable]) =
       try {
         Try(TableUpdaterCore.update(packageName, tableName)) match {

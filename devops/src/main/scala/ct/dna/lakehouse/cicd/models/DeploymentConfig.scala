@@ -58,6 +58,7 @@ case class DeploymentConfig(
 
 object DeploymentConfig {
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   case class ClusterConfiguration(
       /** Databricks Runtime version. Default: latest LTS Scala 2.13 runtime. */
       sparkVersion: String = "17.3.x-scala2.13",
@@ -97,6 +98,7 @@ object DeploymentConfig {
   /** Quartz-based cron schedule for the Databricks job. quartzCronExpression — e.g. "0 0 * ? * *" for every hour on the hour. timezoneId — IANA timezone,
     * defaults to "UTC". pauseStatus — "UNPAUSED" (run) or "PAUSED" (skip). Defaults to "UNPAUSED".
     */
+  @JsonIgnoreProperties(ignoreUnknown = true)
   case class ScheduleConfig(
       quartzCronExpression: String,
       timezoneId: String = "UTC",
@@ -106,6 +108,7 @@ object DeploymentConfig {
   /** Per-catalog continuous-run config. pauseStatus — "UNPAUSED" (run continuously) or "PAUSED" (deployed but inactive). taskRetryMode — "NEVER" (default) or
     * "ON_FAILURE".
     */
+  @JsonIgnoreProperties(ignoreUnknown = true)
   case class ContinuousConfig(
       pauseStatus: String = "UNPAUSED",
       taskRetryMode: String = "NEVER"
@@ -114,6 +117,7 @@ object DeploymentConfig {
   /** Permission entry for the Databricks Asset Bundle target. groupName — display name of the Databricks group. level — valid values: "CAN_MANAGE", "CAN_RUN",
     * "CAN_VIEW".
     */
+  @JsonIgnoreProperties(ignoreUnknown = true)
   case class PermissionConfig(
       groupName: String,
       level: String
@@ -124,6 +128,7 @@ object DeploymentConfig {
     *
     * Field semantics must stay in sync with `ct.dna.lakehouse.core.jobs.orchestrator.MonitoringConfig` in the `lakehouse` project.
     */
+  @JsonIgnoreProperties(ignoreUnknown = true)
   case class MonitoringConfig(
       /** How long an in-JVM worker sleeps when the shared queue returns empty (and the queue is not yet drained). */
       idleSleepSeconds: Long = 5,

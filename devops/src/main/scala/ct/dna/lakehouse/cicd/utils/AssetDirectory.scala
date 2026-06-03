@@ -98,7 +98,12 @@ case class AssetDirectory(
       */
     def buildJobCluster(catalogName: String): JobCluster = {
       val ov = ccOverrides.getOrElse(catalogName, DeploymentConfig.ClusterConfigurationOverride())
-      val effectiveSparkConf = cc.sparkConf ++ ov.sparkConf
+      // Point the FAIR scheduler at the driver-local allocation file written by the init script, via an explicit `file:`
+      // scheme. Injected here — rather than hardcoded per stage in the config JSON — so it can never be a DBFS path
+      // (`DbfsDisabledException`) or a UC volume path (`No Unity API token found in Unity Scope`): Spark resolves this file
+      // through the Hadoop FileSystem at SparkContext init, before Unity Catalog credentials exist.
+      val effectiveSparkConf = cc.sparkConf ++ ov.sparkConf ++
+        Map("spark.scheduler.allocation.file" -> s"file:${InitScript.FairSchedulerLocalDest}")
       val effectiveNodeType = ov.nodeTypeId.getOrElse(cc.nodeTypeId)
       val effectiveDriverNodeType = ov.driverNodeTypeId.getOrElse(cc.driverNodeTypeId)
       val effectiveSparkVersion = ov.sparkVersion.getOrElse(cc.sparkVersion)

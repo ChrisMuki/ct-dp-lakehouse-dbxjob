@@ -13,6 +13,7 @@
       "nodeTypeId": "Standard_E8ds_v5",
       "driverNodeTypeId": "Standard_E8ds_v5",
       "sparkConf": {
+        "spark.scheduler.mode": "FAIR",
         "spark.databricks.io.cache.enabled": "true",
         "spark.sql.autoBroadcastJoinThreshold": "33554432",
         "spark.sql.adaptive.autoBroadcastJoinThreshold": "33554432",

@@ -13,6 +13,7 @@
       "nodeTypeId": "Standard_E96ds_v5",
       "driverNodeTypeId": "Standard_E16ds_v5",
       "sparkConf": {
+        "spark.scheduler.mode": "FAIR",
         "spark.databricks.aggressiveWindowDownS": "600",
         "spark.sql.autoBroadcastJoinThreshold": "33554432",
         "spark.sql.adaptive.autoBroadcastJoinThreshold": "33554432",
