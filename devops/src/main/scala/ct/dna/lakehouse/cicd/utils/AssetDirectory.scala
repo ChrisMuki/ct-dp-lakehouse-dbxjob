@@ -124,12 +124,14 @@ case class AssetDirectory(
         newCluster = NewCluster(
           sparkVersion = effectiveSparkVersion,
           // prod runs on a single big on-demand worker — no spot eviction risk for the production load; dev/qual use
-          // cheaper spot instances (falling back to on-demand only if no spot capacity is available).
+          // cheaper spot instances (falling back to on-demand only if no spot capacity is available). spotBidMaxPrice
+          // stays 100 even for ON_DEMAND_AZURE: the cluster policy validates the field regardless of availability (it is
+          // simply ignored when no spot instances are requested).
           azureAttributes = Stage
             .dqp(
               AzureAttributes(availability = "SPOT_WITH_FALLBACK_AZURE", spotBidMaxPrice = 100),
               AzureAttributes(availability = "SPOT_WITH_FALLBACK_AZURE", spotBidMaxPrice = 100),
-              AzureAttributes(availability = "ON_DEMAND_AZURE", spotBidMaxPrice = -1)
+              AzureAttributes(availability = "ON_DEMAND_AZURE", spotBidMaxPrice = 100)
             ),
           nodeTypeId = effectiveNodeType,
           driverNodeTypeId = effectiveDriverNodeType,
