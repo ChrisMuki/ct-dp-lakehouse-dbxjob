@@ -23,7 +23,6 @@ import ct.dna.utils.collections.DagQueue
 import ct.dna.utils.runtime.Task
 import ct.dna.utils.tryOrIgnore
 import org.apache.spark.sql.SparkSession
-import ct.dna.dataplatform.NamingConvention
 
 /** One worker — a single Databricks-internal [[Task]] launched by [[EntryPoint]] (one per pool thread, via its own `EntryPoint.main` call). Encapsulates all
   * thread-private state (name, [[TableRunRow]] buffer, current table, its own reused [[TableManager]] / [[UpdatedTableProcessor]]). Cross-thread state (queue,
