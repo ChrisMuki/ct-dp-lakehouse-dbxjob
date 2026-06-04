@@ -15,7 +15,6 @@ ASSET_PATH="/tmp/devops"
 ROOT_PATH="$SCRIPT_DIR/../"
 JAR_PATH="$SCRIPT_DIR/../lakehouse/target/scala-2.13/lakehouse.jar"
 
-CONFIG_FILE="$SCRIPT_DIR/src/main/resources/deployment/configFiles/$STAGE.json"
 set -eu
 
 echo "[info] running sbt tests (excluding devops/ColumnWithNameAccessorTest) and lakehouse/assembly" >&2
@@ -34,8 +33,7 @@ if ! sbt \
         \"buildId=$BUILD_ID\" \
         \"rootPath=$ROOT_PATH\" \
         \"assetPath=$ASSET_PATH\" \
-        \"jarPath=$JAR_PATH\" \
-        \"configFile=$CONFIG_FILE\"" ; then
+        \"jarPath=$JAR_PATH\"" ; then
     echo "[ERROR] Deployment failed" >&2
     exit 1
 fi

@@ -1,14 +1,8 @@
 package ct.dna.lakehouse.cicd
 
-import java.io.File
-import java.io.InputStream
-import java.nio.file.Paths
-
-import ct.dna.lakehouse.cicd.models.DeploymentConfig
 import ct.dna.lakehouse.cicd.utils.AssetDirectory
-import ct.dna.utils.ResourceLoader
+import ct.dna.utils.az.auth._
 import ct.dna.utils.deploy.Process
-import ct.dna.utils.json
 import ct.dna.utils.logging.LoggingTrait
 import ct.dna.utils.runtime.Configuration
 
@@ -23,19 +17,19 @@ object Deploy extends LoggingTrait {
       .required("assetPath")
       .required("jarPath")
       .required("buildId")
-      .required("deploymentConfig")
+      .withAzAuth
       .optional("validateOnly", "false")
       .build(args)
 
     val stage = config.getProperty("stage")
-    val rootPath = config.getProperty("rootPath")
     val assetPath = config.getProperty("assetPath")
     val jarPath = config.getProperty("jarPath")
     val buildId = config.getProperty("buildId")
-    val configFile = config.getProperty("configFile")
     val validateOnly = config.getProperty("validateOnly").trim.toBoolean
+    val deploymentAzAuth = config.getAzAuth
 
-    val deploymentConfig = loadDeploymentConfig(configFile)
+    Stage.set(stage)
+    val deploymentConfig = Config.stageConfig
 
     val mode = if (validateOnly) "VALIDATE-ONLY" else "DEPLOY"
     logger.info(s"Starting $mode: stage=$stage buildId=$buildId")
@@ -48,7 +42,7 @@ object Deploy extends LoggingTrait {
       assetDir.assetDir,
       Seq(
         "DATABRICKS_HOST" -> deploymentConfig.host,
-        "DATABRICKS_TOKEN" -> deploymentConfig.deploymentAzAuth.getDbxToken(30)
+        "DATABRICKS_TOKEN" -> deploymentAzAuth.getDbxToken(30)
       )
     )
 
@@ -129,51 +123,4 @@ object Deploy extends LoggingTrait {
     }
   }
 
-  /** Load the deployment config from `configFile`. If a sibling `<basename>.local.json` exists on disk it is loaded **instead** of the committed file (full
-    * replacement, no merge). Local files are gitignored so individual developers can keep a personal copy with overridden `volumeSchema`, schedules, etc.
-    *
-    * Resolution order for the base file (so both `deployTo.sh` relative paths and CI absolute paths work):
-    *   1. Absolute / cwd-relative filesystem path. 2. Classpath resource (the committed config under `devops/src/main/resources/...` ships on the classpath).
-    *
-    * Local override is looked up on the filesystem only; never on the classpath.
-    */
-  private[cicd] def loadDeploymentConfig(configFile: String): DeploymentConfig = {
-    val name = Paths.get(configFile).getFileName.toString
-    val localName =
-      if (name.endsWith(".json")) name.stripSuffix(".json") + ".local.json"
-      else name + ".local"
-
-    val baseFsFile = Some(new File(configFile)).filter(_.isFile)
-    val localCandidate = baseFsFile.map(b => new File(b.getAbsoluteFile.getParentFile, localName))
-    val activeLocal = localCandidate.filter(_.isFile)
-
-    val (jsonBytes, source) = activeLocal match {
-      case Some(local) =>
-        logger.info(s"Using local override config: ${local.getAbsolutePath} (committed file ignored)")
-        (java.nio.file.Files.readAllBytes(local.toPath), local.getAbsolutePath)
-      case None =>
-        baseFsFile match {
-          case Some(b) =>
-            logger.info(s"Using committed config: ${b.getAbsolutePath}")
-            (java.nio.file.Files.readAllBytes(b.toPath), b.getAbsolutePath)
-          case None =>
-            // Fall back to classpath resource (devops jar ships configFiles/* under its resources dir).
-            val loader = ResourceLoader.withContextClassLoader.withClassLoader(getClass).withFilesystem
-            val stream: InputStream = loader
-              .getResourceAsStream(configFile)
-              .getOrElse(throw new java.io.FileNotFoundException(s"Deployment config not found on filesystem or classpath: $configFile"))
-            try {
-              logger.info(s"Using committed config from classpath: $configFile")
-              (stream.readAllBytes(), s"classpath:$configFile")
-            } finally stream.close()
-        }
-    }
-
-    val root = json.mapper.readTree(jsonBytes)
-    val deploymentNode = root.get("deploymentConfig")
-    if (deploymentNode == null) {
-      throw new IllegalArgumentException(s"Config $source does not contain a top-level 'deploymentConfig' object")
-    }
-    json.mapper.readValue[DeploymentConfig](json.mapper.writeValueAsString(deploymentNode))
-  }
 }

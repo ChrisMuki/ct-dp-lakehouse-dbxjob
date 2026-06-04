@@ -1,5 +1,4 @@
 {
-  "rootDir": "/tmp/lakehouse-test",
   "sparkConfig": {
     "clazz": "LocalSpark",
     "master": "local[*]",

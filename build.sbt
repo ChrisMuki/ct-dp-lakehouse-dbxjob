@@ -28,7 +28,7 @@ inThisBuild(
   )
 )
 
-val dnaBomVersion = "4.3.0"
+val dnaBomVersion = "4.8.0"
 val lakehouseSrVersion = "0.9.2"
 
 lazy val lakehouse = project
@@ -47,7 +47,19 @@ lazy val lakehouse = project
       // Test only
       "local-spark-runtime" % Test
     ),
+    // `config/` provides the committed fallback `test-config.json` so a fresh clone (or CI) can run tests without a
+    // local file. A developer may also drop a gitignored override under `src/test/resources/`. Both relativize to the
+    // same target, which makes sbt's `copyResources` abort with "Duplicate mappings". Add `config/` to the test
+    // resource path, then drop any `config/` file whose name also exists under the standard test resources, so the
+    // local override wins locally while `config/` stays the fallback in CI.
     Test / unmanagedResourceDirectories += (ThisBuild / baseDirectory).value / "config",
+    Test / unmanagedResources := {
+      val configDir = (ThisBuild / baseDirectory).value / "config"
+      val all = (Test / unmanagedResources).value
+      val (fromConfig, fromElsewhere) = all.partition(_.relativeTo(configDir).isDefined)
+      val elsewhereNames = fromElsewhere.map(_.getName).toSet
+      fromElsewhere ++ fromConfig.filterNot(f => elsewhereNames.contains(f.getName))
+    },
     libraryDependencies ++= Seq(
       "ct.dna" %% "lakehouse-sr" % lakehouseSrVersion,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test

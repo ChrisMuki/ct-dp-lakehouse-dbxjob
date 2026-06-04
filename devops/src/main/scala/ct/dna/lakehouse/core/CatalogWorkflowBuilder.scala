@@ -1,6 +1,7 @@
 package ct.dna.lakehouse.core
 
-import ct.dna.lakehouse.core.jobs.orchestrator.TaskNames
+import ct.dna.lakehouse.core.lakehousejob.orchestration.{EntryPoint => OrchestrationEntryPoint}
+import ct.dna.lakehouse.core.lakehousejob.summary.{EntryPoint => SummaryEntryPoint}
 import ct.dna.lakehouse.core.model.CatalogSpec
 import ct.dna.utils.deploy.databrickscli.assetbundle._
 import ct.dna.utils.logging.LoggingTrait
@@ -20,10 +21,12 @@ import ct.dna.utils.logging.LoggingTrait
   * @param minRetryIntervalMillis
   *   default retry interval; ignored when `maxRetries` is `None`
   * @param workerCount
-  *   number of `Worker_$i` tasks emitted alongside the single `Summary` task. All share the same `jobCluster` driver JVM and consume the in-memory `DagQueue`.
-  *   Larger values raise driver-side parallelism but also driver memory pressure.
-  * @param monitoringJson
-  *   raw JSON passed as the `monitoringConfig` Spark argument to every task; produced by `AssetDirectory.createDatabricksYml`.
+  *   number of in-process worker threads the single `Orchestrator` task launches inside its driver JVM to consume the in-memory `DagQueue`. Larger values raise
+  *   driver-side parallelism but also driver memory pressure.
+  * @param orchestratorConfigJson
+  *   raw JSON passed as the `orchestratorConfig` Spark argument to `JobSetup`; produced by `AssetDirectory.createDatabricksYml`.
+  * @param summaryConfigJson
+  *   raw JSON passed as the `summaryConfig` Spark argument to `JobSetup`; produced by `AssetDirectory.createDatabricksYml`.
   */
 final case class CatalogJobConfig(
     jobCluster: JobCluster,
@@ -33,30 +36,34 @@ final case class CatalogJobConfig(
     maxRetries: Option[Integer] = Some(2),
     minRetryIntervalMillis: Option[Integer] = Some(60000),
     workerCount: Int = 4,
-    monitoringJson: String = "{}"
+    orchestratorConfigJson: String = "{}",
+    summaryConfigJson: String = "{}"
 )
 
 /** Builds a single Databricks Job per `CatalogSpec`.
   *
-  * The job emits three task kinds connected by explicit `depends_on` edges:
+  * The job has two visible steps connected by an explicit `depends_on` edge, plus a terminal observer:
   *
   * {{{
-  *   JobSetup  ----->  Worker  ----->  Summary (run_if: ALL_DONE)
+  *   JobSetup  ----->  Orchestrator        Summary (run_if: ALL_DONE)
   * }}}
   *
-  *   - one `JobSetup` task that resolves the catalog, builds the dependency plan and enqueues every table,
-  *   - one `Worker` task that spawns `workerCount` internal threads draining the shared `DagQueue` and one in-process status reporter that emits the
-  *     consolidated STATUS block to the same Output tab,
-  *   - one terminal `Summary` task with `run_if: ALL_DONE` that appends the per-run row to the configured Delta table and emits the final SUMMARY log line.
+  *   - one `JobSetup` step that resolves the catalog, builds the dependency plan, enqueues every table and publishes the shared state,
+  *   - one `Orchestrator` step that launches `workerCount` in-process worker threads, tracks live status and turns the run RED on failure,
+  *   - one terminal `Summary` step with `run_if: ALL_DONE` that appends the per-run row to the configured Delta table and emits the final SUMMARY log line.
   *
-  * Every task runs on the shared `jobCluster` and \u2014 thanks to `run_as_repl=true` on the Spark JAR task descriptor \u2014 inside the same driver REPL JVM,
-  * so the in-JVM `CatalogOrchestrator` singleton genuinely spans tasks. The `lakehouse_runs` / `lakehouse_table_runs` Delta tables hold cross-run persistent
-  * state and remain the integration surface for external dashboards.
+  * `JobSetup` and `Orchestrator` share the [[ct.dna.lakehouse.core.lakehousejob.orchestration.EntryPoint]] entry point; `Summary` has its own
+  * ([[ct.dna.lakehouse.core.lakehousejob.summary.EntryPoint]]) so it survives an aborted Orchestrator. Every step runs on the shared `jobCluster` and — thanks
+  * to `run_as_repl=true` — inside the same driver REPL JVM, so the in-JVM shared state genuinely spans steps. The `lakehouse_runs` / `lakehouse_table_runs`
+  * Delta tables hold cross-run persistent state and remain the integration surface for external dashboards.
   */
 object CatalogWorkflowBuilder extends LoggingTrait {
 
   private val entryPointClass: String =
-    "ct.dna.lakehouse.core.jobs.orchestrator.CatalogOrchestrator"
+    "ct.dna.lakehouse.core.lakehousejob.orchestration.EntryPoint"
+
+  private val summaryEntryPointClass: String =
+    "ct.dna.lakehouse.core.lakehousejob.summary.EntryPoint"
 
   def calcJobName(catalogSpec: CatalogSpec): String =
     s"lakehouse-${catalogSpec.id.name}"
@@ -72,28 +79,25 @@ object CatalogWorkflowBuilder extends LoggingTrait {
 
     val catalogClass = catalogSpec.getClass.getPackage.getName
     logger.info(
-      s"Catalog '${catalogSpec.id.name}': emitting ${TaskNames.SetupTaskKey} -> ${TaskNames.WorkerTaskKey}(poolSize=${config.workerCount}) -> " +
-        s"${TaskNames.SummaryTaskKey} (catalogClass=$catalogClass)"
+      s"Catalog '${catalogSpec.id.name}': emitting ${OrchestrationEntryPoint.JobSetup} -> ${OrchestrationEntryPoint.Orchestrator}(poolSize=${config.workerCount}) -> " +
+        s"${SummaryEntryPoint.Summary} (catalogClass=$catalogClass)"
     )
 
     val library = Library(jar = jarPath)
 
-    /** Common runtime params: every task receives the monitoring JSON arg as arg(0) and the `configFile` / `monitoringConfig` properties as positional args for
-      * `ct.dna.utils.runtime.Configuration`.
-      */
-    def runtimeParams(taskJson: String): List[String] = List(
-      taskJson,
-      s"configFile=$configFilePath",
-      s"monitoringConfig=${config.monitoringJson}"
-    )
-
-    // --- JobSetup: boots the singleton, builds the plan, exits ---
+    // --- JobSetup: boots the shared state, builds the plan, exits ---
     val jobSetupTask = Task(
-      taskKey = TaskNames.SetupTaskKey,
+      taskKey = OrchestrationEntryPoint.JobSetup,
       sparkJarTask = Some(
         SparkJarTask(
           mainClassName = entryPointClass,
-          parameters = runtimeParams(s"""{"clazz":"JobSetup","catalogClass":"$catalogClass","runId":"{{job.run_id}}"}""")
+          parameters = List(
+            OrchestrationEntryPoint.JobSetup,
+            s"""runConfig={"catalogClass":"$catalogClass","runId":"{{job.run_id}}","workerCount":${config.workerCount}}""",
+            s"configFile=$configFilePath",
+            s"orchestratorConfig=${config.orchestratorConfigJson}",
+            s"summaryConfig=${config.summaryConfigJson}"
+          )
         )
       ),
       jobClusterKey = config.jobCluster.jobClusterKey,
@@ -102,16 +106,14 @@ object CatalogWorkflowBuilder extends LoggingTrait {
       minRetryIntervalMillis = config.minRetryIntervalMillis
     )
 
-    val setupDependency = List(DependsRef(taskKey = TaskNames.SetupTaskKey))
-
-    // --- Worker: single task that spawns `workerCount` internal threads + an in-process status reporter ---
-    val workerTask = Task(
-      taskKey = TaskNames.WorkerTaskKey,
-      dependsOn = setupDependency,
+    // --- Orchestrator: launches `workerCount` internal worker threads + drives the live status / watchdog ---
+    val orchestratorTask = Task(
+      taskKey = OrchestrationEntryPoint.Orchestrator,
+      dependsOn = List(DependsRef(taskKey = OrchestrationEntryPoint.JobSetup)),
       sparkJarTask = Some(
         SparkJarTask(
           mainClassName = entryPointClass,
-          parameters = runtimeParams(s"""{"clazz":"WorkerPool","poolSize":${config.workerCount},"runId":"{{job.run_id}}"}""")
+          parameters = List(OrchestrationEntryPoint.Orchestrator)
         )
       ),
       jobClusterKey = config.jobCluster.jobClusterKey,
@@ -121,15 +123,15 @@ object CatalogWorkflowBuilder extends LoggingTrait {
       minRetryIntervalMillis = None
     )
 
-    // --- Summary: terminal observer. Depends only on Worker now (Monitor task no longer exists).
-    // Databricks `run_if: ALL_DONE` (so Summary fires even on Worker failure) is injected post-serialisation in `AssetDirectory.injectSummaryRunIf`.
+    // --- Summary: terminal observer with its own entry point. Depends on Orchestrator.
+    // Databricks `run_if: ALL_DONE` (so Summary fires even on Orchestrator failure) is injected post-serialisation in `AssetDirectory.injectSummaryRunIf`.
     val summaryTask = Task(
-      taskKey = TaskNames.SummaryTaskKey,
-      dependsOn = List(DependsRef(taskKey = TaskNames.WorkerTaskKey)),
+      taskKey = SummaryEntryPoint.Summary,
+      dependsOn = List(DependsRef(taskKey = OrchestrationEntryPoint.Orchestrator)),
       sparkJarTask = Some(
         SparkJarTask(
-          mainClassName = entryPointClass,
-          parameters = runtimeParams("""{"clazz":"Summary","runId":"{{job.run_id}}"}""")
+          mainClassName = summaryEntryPointClass,
+          parameters = List(SummaryEntryPoint.Summary)
         )
       ),
       jobClusterKey = config.jobCluster.jobClusterKey,
@@ -138,7 +140,7 @@ object CatalogWorkflowBuilder extends LoggingTrait {
       minRetryIntervalMillis = None
     )
 
-    val tasks: List[Task] = List(jobSetupTask, workerTask, summaryTask)
+    val tasks: List[Task] = List(jobSetupTask, orchestratorTask, summaryTask)
 
     val jobName = calcJobName(catalogSpec)
     jobName -> Job(

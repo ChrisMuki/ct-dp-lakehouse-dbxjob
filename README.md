@@ -134,7 +134,7 @@ Arguments:  configFile=<path>  <package_name>  <table_name>
 Example:    configFile=config/config.json  ct.dna.lakehouse.sr.ct_gbl_e32  ekbe
 ```
 
-At deploy time, [CatalogWorkflowBuilder](devops/src/main/scala/ct/dna/lakehouse/core/CatalogWorkflowBuilder.scala) emits **one Databricks Job per catalog** (`sr`, `dm_md`, `dw_tx`, …) with three tasks — `JobSetup → Worker → Summary` — sharing one `job_cluster`. The `Worker` task runs an in-process worker pool driven by a shared [CatalogOrchestrator](lakehouse/src/main/scala/ct/dna/lakehouse/core/jobs/orchestrator/CatalogOrchestrator.scala) singleton that walks each `TableSpec`'s `sourceTableSpecs`, builds the intra-catalog DAG, Kahn topo-sorts it, and dispatches tables once their parents complete.
+At deploy time, [CatalogWorkflowBuilder](devops/src/main/scala/ct/dna/lakehouse/core/CatalogWorkflowBuilder.scala) emits **one Databricks Job per catalog** (`sr`, `dm_md`, `dw_tx`, …) with three tasks — `JobSetup → Worker → Summary` — sharing one `job_cluster`. The `Worker` task runs an in-process worker pool driven by a shared [LakehouseJob](lakehouse/src/main/scala/ct/dna/lakehouse/core/lakehousejob/LakehouseJob.scala) singleton that walks each `TableSpec`'s `sourceTableSpecs`, builds the intra-catalog DAG, Kahn topo-sorts it, and dispatches tables once their parents complete.
 
 Per-catalog tuning (worker count, schedule, cluster shape) lives in the deployment config — see [devops/README.md](devops/README.md).
 

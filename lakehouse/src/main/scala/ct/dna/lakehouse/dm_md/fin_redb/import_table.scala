@@ -9,7 +9,6 @@ import ct.dna.lakehouse.core.model.Entity.PK
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.Updated
 import org.apache.spark.sql.SparkSession
-// import ct.dna.lakehouse.sr_raw.dw_tx_finfxrates.{fxrates => sr_raw_fxrates}
 import org.apache.spark.sql.functions._
 
 case class DmImportTable(

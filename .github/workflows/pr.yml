@@ -14,23 +14,28 @@ concurrency:
 
 run-name: ${{ github.actor }} run PR checks
 
+permissions:
+  # PR runs are validation-only: read source, no tags, no commits.
+  contents: read
+  # Required for the self-refreshing GitHub-OIDC credential below; the staged
+  # Scala launcher uses it to mint a Databricks bearer token for
+  # `databricks bundle validate`.
+  id-token: write
+
+env:
+  azAuth: ${{ vars.AZAUTH }}
+
 jobs:
   pr:
     name: PR checks for ${{ github.actor }}
-    runs-on: dna-db
+    runs-on: dna17-2
     # Use the `dev` GitHub Environment so we inherit its scoped vars/secrets
-    # (AZURE_CLIENT_ID, AZURE_TENANT_ID, ARTIFACTORY_*). These are not defined
-    # at the repo level, so without this the Azure OIDC login receives empty
-    # client-id/tenant-id and fails.
+    # (AZAUTH, ARTIFACTORY_*). These are not defined at the repo level.
     environment: dev
-    container:
-      image: dsfacr.azurecr.io/runner/dna_temurin_17:latest
     permissions:
       # PR runs are validation-only: read source, no tags, no commits.
       contents: read
-      # Required for the Azure OIDC login below; the staged Scala launcher
-      # uses the resulting az-cli token to mint a Databricks bearer token
-      # for `databricks bundle validate`.
+      # Required for the GitHub OIDC credential used by the launcher.
       id-token: write
     steps:
       - name: Checkout
@@ -40,30 +45,15 @@ jobs:
 
       - name: Prepare runner environment
         uses: CT-DnA/devops-library/.github/actions/runner-config@v1
-
-      # sbt needs Artifactory creds to resolve internal `ct.dna.*` deps,
-      # but the launcher is invoked with validateOnly=true so the token
-      # is never used to publish.
-      - name: Prepare sbt credentials
-        uses: CT-DnA/devops-library/.github/actions/sbt-credentials@v1
         with:
-          host: ${{ vars.ARTIFACTORY_HOST }}
-          username: ${{ vars.ARTIFACTORY_USER }}
-          token: ${{ secrets.ARTIFACTORY_TOKEN }}
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          allow-no-subscriptions: true
+          debugProxy: true
 
       # Mirror the push workflow's build line so PRs catch the same set
       # of compile/test/assembly failures the deploy job would hit.
       - name: Build (test + assembly + stage)
         env:
           sparkConfig: ${{ vars.SCALATEST_LOCAL_SPARKCONFIG }}
-        run: sbt "Test/compile" "lakehouse/test" "lakehouse/assembly" "devops/stage"
+        run: sbt "Test/compile" "scalafixAll --check" "test" "lakehouse/assembly" "devops/stage"
 
       # Run the deploy orchestrator end-to-end EXCEPT the side-effecting steps
       # (volume upload, bundle deploy, bundle run, git tag, cleanup). That
@@ -71,11 +61,6 @@ jobs:
       # using the exact assets the push workflow would deploy.
       - name: Validate deploy bundle (validateOnly)
         run: |
-          CONFIG_FILE="${GITHUB_WORKSPACE}/devops/src/main/resources/deployment/configFiles/dev.json"
-          if [ ! -f "${CONFIG_FILE}" ]; then
-            echo "::error::Deployment config not found: ${CONFIG_FILE}"
-            exit 1
-          fi
           BUILD_ID="pr-$(git rev-parse --short HEAD)"
 
           ./devops/target/universal/stage/bin/deploy \
@@ -84,6 +69,5 @@ jobs:
             "rootPath=${GITHUB_WORKSPACE}" \
             "assetPath=/tmp/devops" \
             "jarPath=${GITHUB_WORKSPACE}/lakehouse/target/scala-2.13/lakehouse.jar" \
-            "configFile=${CONFIG_FILE}" \
             "validateOnly=true"
  

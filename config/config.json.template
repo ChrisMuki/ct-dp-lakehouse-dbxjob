@@ -1,5 +1,4 @@
 {
-  "rootDir": "/tmp/lakehouse",
   "sparkConfig": {
     "clazz": "RemoteSandbox",
     "stage": "prod",

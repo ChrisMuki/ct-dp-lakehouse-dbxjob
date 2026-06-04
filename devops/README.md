@@ -5,10 +5,10 @@ Builds, tests, and deploys `lakehouse.jar` to Databricks as an **Asset Bundle**.
 Each catalog (`sr`, `dm_md`, `dw_tx`, …) becomes **one Databricks Job** named `lakehouse-<catalog>`, with three tasks sharing one `job_cluster`:
 
 ```
-JobSetup ──► Worker (in-process pool) ──► Summary
+JobSetup ──► Orchestrator (in-process worker pool) ──► Summary
 ```
 
-Deployment is driven by a JSON config file (one per stage), committed under [src/main/resources/deployment/configFiles/](src/main/resources/deployment/configFiles/). The configs **do not contain secrets** — auth is OIDC / Azure CLI / Managed Identity. Developers can drop a sibling `<stage>.local.json` next to the committed file to fully override it locally (gitignored, never merged).
+Deployment is driven by per-stage configuration encoded directly in Scala in [`Config.scala`](src/main/scala/ct/dna/lakehouse/cicd/Config.scala). `Config.stageConfig` builds the `Config` for the active stage (held in `Stage`, a `SetOnce[Stage]` set by [`Deploy`](src/main/scala/ct/dna/lakehouse/cicd/Deploy.scala) from the `stage=` launcher argument); a small `dqp(dev, qual, prod)` helper picks the per-stage value, so shared defaults are written once and anything wrapped in `dqp(...)` is the part that varies. The config holds **no secrets** — auth is OIDC / Azure CLI / Managed Identity. The stage is selected purely by the `stage=` launcher argument; there is no config file to locate or pass.
 
 ---
 
@@ -19,7 +19,7 @@ Deployment is driven by a JSON config file (one per stage), committed under [src
 - Java 17
 - sbt 1.11.2+
 - Databricks CLI (`curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh`)
-- `az login` (the committed dev/qual/prod configs use `deploymentAzAuth: "AzureCli"` locally)
+- `az login` (the default `azAuth=AzureCli` makes the Databricks CLI authenticate via your logged-in Azure CLI)
 
 ### Run
 
@@ -39,22 +39,17 @@ Deployment is driven by a JSON config file (one per stage), committed under [src
 
 See [`Deploy.scala`](src/main/scala/ct/dna/lakehouse/cicd/Deploy.scala) for the exact orchestration.
 
-### Local override file
-
-If a `<stage>.local.json` exists next to the committed `<stage>.json`, the launcher uses it **instead of** the committed file (full replacement — no deep merge). Useful for tweaking `volumeSchema`, schedules, or cluster sizes during local testing without touching the committed config.
-
 ---
 
 ## Configuration Reference
 
-All fields except `host` and `deploymentAzAuth` are optional with defaults defined in [`DeploymentConfig.scala`](src/main/scala/ct/dna/lakehouse/cicd/models/DeploymentConfig.scala). The config is wrapped in a top-level `deploymentConfig` object — the loader rejects files that omit the wrapper.
+All fields except `host` are required on the `Config` case class in [`Config.scala`](src/main/scala/ct/dna/lakehouse/cicd/Config.scala) and are set explicitly per stage in `Config.stageConfig`; to change a stage, edit that method (wrap stage-specific values in `dqp(...)`, leave shared values as a single literal). Azure auth is **not** part of `Config` — it is supplied at runtime via the `azAuth` property (see [Azure auth](#azure-auth) below).
 
 ### Top-level
 
 | Field | Default | Notes |
 |---|---|---|
 | `host` | — *(required)* | Databricks workspace URL |
-| `deploymentAzAuth` | — *(required)* | See [Azure auth](#azure-auth) below |
 | `volumeCatalog` | `lakehouse` (prod) / `<stage>_lakehouse` | UC catalog backing the job-resource volume |
 | `volumeSchema` | `default` | UC schema in the volume path |
 | `targetMode` | `production` | `development` makes the CLI prefix the job name with `[dev <user>]` and run the job as the deploying identity |
@@ -62,9 +57,9 @@ All fields except `host` and `deploymentAzAuth` are optional with defaults defin
 | `clusterConfigurations` | `{}` | **Per-catalog** overrides on top of `clusterConfiguration` |
 | `schedules` | `{}` | Per-catalog Quartz cron schedules |
 | `continuous` | `{}` | Per-catalog continuous-run config (mutually exclusive with `schedules` for the same catalog) |
-| `taskParallelismDefault` | `4` | In-JVM table-parallelism inside the Worker task (not the Spark worker count) |
-| `taskParallelism` | `{}` | Per-catalog override of the above |
-| `monitoring` | see below | Runtime knobs for the orchestrator + Summary table |
+| `taskParallelism` | `{}` default `4` | In-JVM table-parallelism per catalog (not the Spark worker count); a map with a default value for unlisted catalogs |
+| `orchestrator` | see below | Runtime knobs for the Orchestrator (status cadence, watchdog, per-table results table) |
+| `summary` | see below | Runtime knobs for the terminal Summary step |
 | `permissions` | `[]` | Target-level permissions emitted into the bundle |
 
 ### `clusterConfiguration` / `clusterConfigurations.<catalog>`
@@ -91,31 +86,36 @@ The per-catalog overrides under `clusterConfigurations` are all optional — abs
 
 Catalogs absent from both maps are deployed unscheduled and must be triggered manually or via API. `pauseStatus` defaults to `UNPAUSED`.
 
-### `monitoring`
+### `orchestrator`
 
 | Field | Default | Notes |
 |---|---|---|
-| `idleSleepSeconds` | `5` | Worker sleep when the shared queue returns empty |
 | `statusIntervalSeconds` | `60` | Interval between consolidated status log lines |
-| `summaryCatalog` / `summarySchema` | `volumeCatalog` / `volumeSchema` | UC location for the Summary Delta table |
-| `summaryTable` | `lakehouse_runs` | Per-run summary table (written by the `Summary` task) |
-| `summaryEnabled` | `true` | When `false`, the Summary task only logs and skips the Delta write |
-| `tableRunsTable` | `lakehouse_table_runs` | Per-table results table (appended by every Worker) |
-| `tableRunsEnabled` | `true` | When `false`, Workers/Summary skip per-table Delta writes |
+| `maxTableRuntimeSeconds` | none | Optional per-table watchdog; cancels a Worker that exceeds the limit |
+| `tableRuns` | `{ catalog: volumeCatalog, schema: volumeSchema, table: "lakehouse_table_runs" }` | UC coordinates of the per-table results Delta table (appended by every Worker). Supply all three (`catalog`, `schema`, `table`) to override |
+| `tableRunsEnabled` | `true` | When `false`, Workers skip per-table Delta writes |
+
+### `summary`
+
+| Field | Default | Notes |
+|---|---|---|
+| `target` | `{ catalog: volumeCatalog, schema: volumeSchema, table: "lakehouse_runs" }` | UC coordinates of the per-run Summary Delta table. Supply all three (`catalog`, `schema`, `table`) to override |
+| `enabled` | `true` | When `false`, the Summary task only logs and skips the Delta write |
 
 ### Azure auth
 
-`deploymentAzAuth` is deserialised by the `AzAuth` Jackson deserializer (from `common-utils`). Supported subtypes:
+Azure auth for the Databricks CLI is supplied at runtime through the `azAuth` launcher property (resolved by `Configuration` from a runtime arg, a config file, a JVM option, or an **environment variable** — in that order), **not** from `Config`. The value is parsed by `AzAuth(...)` (from `common-utils`):
 
-| Form | Shape | Used for |
+| `azAuth` value | Shape | Used for |
 |---|---|---|
-| `"AzureCli"` | string literal | Local dev (`az login` provides the token) |
-| `ClientSecret` | `{ "tenantId": "...", "clientId": "...", "clientSecret": "..." }` | CI/CD |
-| `ManagedIdentity` | `{ ... }` | Hosted runners with an MSI |
+| `AzureCli` *(default)* | string literal | Local dev (`az login` provides the token) and CI (after `azure/login` OIDC) |
+| `ManagedIdentity` | string literal | Hosted runners with an MSI |
+| `{"tenantId":...,"clientId":...,"clientSecret":...}` | JSON | Explicit service-principal (`ClientSecret`) auth |
+| `{"tenantId":...,"clientId":...}` | JSON | GitHub OIDC (`GithubOidc`) workload-identity federation |
 
-See [`template.json`](src/main/resources/deployment/configFiles/template.json) for an annotated example.
+In the GitHub workflows the value is passed as the `azAuth` environment variable from the repo/environment variable `DEPLOY_AZ_AUTH`; when that variable is unset the launcher falls back to `AzureCli`. Locally it defaults to `AzureCli`, so `az login` is all that is needed.
 
-> **Committed `<stage>.json` files do not contain secrets.** Auth either uses Azure CLI (local) or an OIDC-issued token (CI). Never paste a `clientSecret` into a committed file.
+> **The in-code config holds no secrets.** Auth either uses Azure CLI (local) or an OIDC-issued token (CI). Never hard-code a `clientSecret`.
 
 ---
 
@@ -158,7 +158,7 @@ The workflow runs (in order):
 4. Resolve stage from branch / dispatch input; compute `buildId = <yyyymmdd-HHMM>-<sha7>`
 5. `azure/login@v2` (OIDC)
 6. `sbt "Test/compile" "lakehouse/test" "lakehouse/assembly" "devops/stage"`
-7. Run `./devops/target/universal/stage/bin/deploy stage=… buildId=… rootPath=… assetPath=/tmp/devops jarPath=… configFile=devops/src/main/resources/deployment/configFiles/<stage>.json`
+7. Run `./devops/target/universal/stage/bin/deploy stage=… buildId=… rootPath=… assetPath=/tmp/devops jarPath=…` (the stage selects the in-code config)
 
 ---
 
@@ -171,17 +171,12 @@ devops/
 └── src/main/
     ├── resources/
     │   ├── log4j2.xml                           # sbt-launcher log config (not deployed)
-    │   ├── runtime-log4j2.xml                   # Copied to the volume as log4j2.xml (cluster runtime config)
-    │   └── deployment/configFiles/
-    │       ├── template.json                    # Annotated config template
-    │       ├── dev.json                         # Committed dev config (no secrets)
-    │       ├── qual.json                        # Committed qual config (no secrets)
-    │       └── prod.json                        # Committed prod config (no secrets)
+    │   └── runtime-log4j2.xml                   # Copied to the volume as log4j2.xml (cluster runtime config)
     └── scala/ct/dna/lakehouse/
         ├── cicd/
+        │   ├── Config.scala                     # Per-stage deployment config in code (Config + Config.stageConfig, dqp dev/qual/prod)
         │   ├── Deploy.scala                     # Deployment orchestration
         │   ├── models/
-        │   │   ├── DeploymentConfig.scala       # Config model + all defaults
         │   │   ├── ConfigFile.scala             # Runtime config JSON written to the volume
         │   │   ├── InitScript.scala             # init_script.sh generator
         │   │   └── AsFile.scala                 # Jackson YAML serialization helpers
@@ -199,7 +194,7 @@ devops/
 |---|---|
 | `Bundle validate fails` | Run `databricks bundle validate` inside the staging dir to see the full diff. Check `databricks.yml` syntax — it is generated, so the bug is usually in `AssetDirectory.scala` / `CatalogWorkflowBuilder.scala`. |
 | `Volume already exists` | Informational — `Deploy.scala` ignores the non-zero exit and continues. |
-| `Configuring both schedule and continuous for the same catalog` | Databricks rejects this combination; remove one of the entries from the offending catalog in your `<stage>.json`. |
-| `Deployment config not found` | The path passed via `configFile=` does not exist on disk or on the classpath; check that the file was committed and that `deployTo.sh` is being run from the repo root. |
+| `Configuring both schedule and continuous for the same catalog` | Databricks rejects this combination; remove one of the entries for the offending catalog in [`Config.scala`](src/main/scala/ct/dna/lakehouse/cicd/Config.scala). |
+| `Unknown stage '<x>'` | `Config.stageConfig` only accepts `dev`, `qual` or `prod`; check the `stage=` argument. |
 | `sbt credentials failure` | Ensure `~/.sbt/.credentials` is configured locally, or check `ARTIFACTORY_HOST` / `ARTIFACTORY_USER` / `ARTIFACTORY_TOKEN` in the GitHub Environment. |
 | `Schedule null warnings` from `databricks bundle validate` | Expected for catalogs that omit a `schedules` entry — suppressed by `NON_ABSENT` serialization. |

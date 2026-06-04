@@ -16,7 +16,7 @@
     <Logger name="ct.dna.lakehouse" level="info" additivity="false">
       <AppenderRef ref="console.always" />
     </Logger>
-    <Logger name="ct.dna.lakehouse.core" level="error" additivity="false">
+    <Logger name="ct.dna.lakehouse.core" level="info" additivity="false">
       <AppenderRef ref="console.always" />
     </Logger>
     <Logger name="ct.dna.utils.runtime" level="debug" additivity="false">

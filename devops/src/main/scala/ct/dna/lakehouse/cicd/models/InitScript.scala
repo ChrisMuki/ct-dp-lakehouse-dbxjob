@@ -85,7 +85,7 @@ object InitScript {
       .map { i =>
         val weight = BigInt(10).pow(i)
         s"""  <pool name="lakehouse-$i">
-           |    <schedulingMode>FAIR</schedulingMode>
+           |    <schedulingMode>FIFO</schedulingMode>
            |    <weight>$weight</weight>
            |    <minShare>0</minShare>
            |  </pool>""".stripMargin

@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - qual
-      - dev
   workflow_dispatch:
     inputs:
       environment:
@@ -24,15 +22,19 @@ concurrency:
 
 run-name: ${{ github.actor }} deploy databricks lakehouse job
 
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  azAuth: ${{ vars.AZAUTH }}
+
 jobs:
   deploy:
     name: Deploy lakehouse by ${{ github.actor }}
-    runs-on: dna-db
-    environment: ${{ github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.environment || github.ref == 'refs/heads/main' &&
-      'prod' || github.ref == 'refs/heads/qual' && 'qual' || 'dev' }}
-    container:
-      image: dsfacr.azurecr.io/runner/dna_temurin_17:latest
+    runs-on: dna17-2
+    # workflow_dispatch picks the environment via input; a push to main always deploys prod.
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'prod' }}
     permissions:
       contents: write
       id-token: write
@@ -44,36 +46,20 @@ jobs:
 
       - name: Prepare runner environment
         uses: CT-DnA/devops-library/.github/actions/runner-config@v1
-
-      - name: Prepare sbt credentials
-        uses: CT-DnA/devops-library/.github/actions/sbt-credentials@v1
         with:
-          host: ${{ vars.ARTIFACTORY_HOST }}
-          username: ${{ vars.ARTIFACTORY_USER }}
-          token: ${{ secrets.ARTIFACTORY_TOKEN }}
+          debugProxy: true
 
       - name: Determine stage
         id: stage
         run: |
+          # workflow_dispatch picks the stage via input; a push to main always deploys prod.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             STAGE="${{ github.event.inputs.environment }}"
-          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            STAGE="prod"
-          elif [ "${{ github.ref }}" = "refs/heads/qual" ]; then
-            STAGE="qual"
           else
-            STAGE="dev"
+            STAGE="prod"
           fi
           echo "STAGE=${STAGE}" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$(date +'%Y%m%d-%H%M')-$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
-
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          allow-no-subscriptions: true
 
       # One sbt invocation: compile + tests + assembly + stage. `sparkConfig` is read by `Configuration` from the
       # environment (it wins over any local `test-config.json`) so `TestWithSpark` can spin up a `LocalSpark` session
@@ -82,31 +68,21 @@ jobs:
       - name: Build (test + assembly + stage)
         env:
           sparkConfig: ${{ vars.SCALATEST_LOCAL_SPARKCONFIG }}
-        run: sbt "Test/compile" "lakehouse/test" "lakehouse/assembly" "devops/stage"
+        run: sbt "Test/compile" "scalafixAll --check" "test" "lakehouse/assembly" "devops/stage"
 
       - name: Configure git identity
         uses: CT-DnA/devops-library/.github/actions/git-identity@v1
 
       - name: Deploy to ${{ steps.stage.outputs.STAGE }}
-        # env:
-        #  DATABRICKS_TF_PROVIDER: opentofu
         run: |
           STAGE="${{ steps.stage.outputs.STAGE }}"
           BUILD_ID="${{ steps.stage.outputs.BUILD_ID }}"
 
-          # Deployment config is committed in-repo (no secrets). Local per-user overrides under
-          # devops/src/main/resources/deployment/configFiles/<stage>.local.json are deep-merged by the
-          # Scala launcher; they don't exist in CI so the committed file is used as-is.
-          CONFIG_FILE="${GITHUB_WORKSPACE}/devops/src/main/resources/deployment/configFiles/${STAGE}.json"
-          if [ ! -f "${CONFIG_FILE}" ]; then
-            echo "::error::Deployment config not found: ${CONFIG_FILE}"
-            exit 1
-          fi
-
+          # Deployment config is committed in-repo as plain Scala (Config.stageConfig); it is selected purely by the
+          # "stage=" argument, so there is no config file to locate or pass.
           ./devops/target/universal/stage/bin/deploy \
             "stage=${STAGE}" \
             "buildId=${BUILD_ID}" \
             "rootPath=${GITHUB_WORKSPACE}" \
             "assetPath=/tmp/devops" \
-            "jarPath=${GITHUB_WORKSPACE}/lakehouse/target/scala-2.13/lakehouse.jar" \
-            "configFile=${CONFIG_FILE}"
+            "jarPath=${GITHUB_WORKSPACE}/lakehouse/target/scala-2.13/lakehouse.jar"

@@ -5,12 +5,16 @@ import java.nio.file.Paths
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.node.ObjectNode
+import ct.dna.lakehouse.cicd.Config
+import ct.dna.lakehouse.cicd.Stage
 import ct.dna.lakehouse.cicd.models.ConfigFile
-import ct.dna.lakehouse.cicd.models.DeploymentConfig
 import ct.dna.lakehouse.cicd.models.InitScript
 import ct.dna.lakehouse.core.CatalogJobConfig
 import ct.dna.lakehouse.core.CatalogWorkflowBuilder
-import ct.dna.lakehouse.core.jobs.orchestrator.TaskNames
+import ct.dna.lakehouse.core.lakehousejob.config.OrchestratorConfig
+import ct.dna.lakehouse.core.lakehousejob.config.SummaryConfig
+import ct.dna.lakehouse.core.lakehousejob.config.TableRef
+import ct.dna.lakehouse.core.lakehousejob.summary.{EntryPoint => SummaryEntryPoint}
 import ct.dna.lakehouse.core.model.CatalogSpec
 import ct.dna.lakehouse.core.runtime.SparkConfig
 import ct.dna.lakehouse.dm_md.{`package` => dmCatalog}
@@ -26,7 +30,7 @@ case class AssetDirectory(
     stage: String,
     assetPath: String,
     buildId: String,
-    deploymentConfig: DeploymentConfig
+    deploymentConfig: Config
 ) extends LoggingTrait {
 
   private val resourceLoader = ResourceLoader.withContextClassLoader
@@ -77,7 +81,6 @@ case class AssetDirectory(
   def createConfigJson(): ConfigFile = {
     logger.info("Building 'config.json'")
     val cf = ConfigFile(
-      rootDir = "/tmp/lakehouse",
       sparkConfig = SparkConfig.Lakehouse(stage)
     )
     cf.writeToFolder(assetDir)
@@ -97,7 +100,7 @@ case class AssetDirectory(
       * is shallow-merged (per-catalog entries override the global on key collisions).
       */
     def buildJobCluster(catalogName: String): JobCluster = {
-      val ov = ccOverrides.getOrElse(catalogName, DeploymentConfig.ClusterConfigurationOverride())
+      val ov = ccOverrides.getOrElse(catalogName, Config.ClusterConfigurationOverride())
       // Point the FAIR scheduler at the driver-local allocation file written by the init script, via an explicit `file:`
       // scheme. Injected here — rather than hardcoded per stage in the config JSON — so it can never be a DBFS path
       // (`DbfsDisabledException`) or a UC volume path (`No Unity API token found in Unity Scope`): Spark resolves this file
@@ -120,10 +123,14 @@ case class AssetDirectory(
         jobClusterKey = s"${catalogName}-cluster",
         newCluster = NewCluster(
           sparkVersion = effectiveSparkVersion,
-          azureAttributes = AzureAttributes(
-            availability = "SPOT_WITH_FALLBACK_AZURE",
-            spotBidMaxPrice = 100
-          ),
+          // prod runs on a single big on-demand worker — no spot eviction risk for the production load; dev/qual use
+          // cheaper spot instances (falling back to on-demand only if no spot capacity is available).
+          azureAttributes = Stage
+            .dqp(
+              AzureAttributes(availability = "SPOT_WITH_FALLBACK_AZURE", spotBidMaxPrice = 100),
+              AzureAttributes(availability = "SPOT_WITH_FALLBACK_AZURE", spotBidMaxPrice = 100),
+              AzureAttributes(availability = "ON_DEMAND_AZURE", spotBidMaxPrice = -1)
+            ),
           nodeTypeId = effectiveNodeType,
           driverNodeTypeId = effectiveDriverNodeType,
           clusterLogConf = ClusterLogConf(
@@ -188,38 +195,37 @@ case class AssetDirectory(
       */
     val catalogs: List[CatalogSpec] = List(srCatalog, dwCatalog, dmCatalog)
 
-    // Monitoring runtime config is shared across every catalog job; serialised
-    // once and passed verbatim as the `monitoringConfig=<json>` Spark argument.
-    // Field set is a superset-compatible match for `MonitoringConfig` in the
-    // `lakehouse` module. Default the summary/table-runs coordinates to the deployment's
-    // volume catalog/schema.
-    val monitoringWithDefaults = deploymentConfig.monitoring.copy(
-      summaryCatalog = deploymentConfig.monitoring.summaryCatalog.orElse(Some(volumeCatalog)),
-      summarySchema = deploymentConfig.monitoring.summarySchema.orElse(Some(volumeSchema))
+    // Per-task runtime configs are shared across every catalog job; serialised
+    // once and passed verbatim as the `orchestratorConfig` / `summaryConfig`
+    // Spark arguments to `JobSetup`. The per-table results and per-run summary
+    // Delta coordinates default to the deployment's volume catalog/schema and
+    // the per-task default table name.
+    val orchestratorWithDefaults = deploymentConfig.orchestrator.copy(
+      tableRuns = Some(
+        deploymentConfig.orchestrator.tableRuns
+          .getOrElse(TableRef(volumeCatalog, volumeSchema, OrchestratorConfig.DefaultTableRunsTable))
+      )
     )
-    val monitoringJson: String = jsonMapper.writeValueAsString(monitoringWithDefaults)
+    val orchestratorConfigJson: String = jsonMapper.writeValueAsString(orchestratorWithDefaults)
 
-    // Jackson deserialises numeric JSON values inside `Map[String, Int]` as
-    // boxed `java.lang.Long`. Reading the value through a `Map[String, Int]`
-    // view triggers Scala's unbox-to-Int which then fails. Access the raw
-    // boxed map via `Any` and coerce explicitly through `Number.intValue`.
-    val rawTaskParallelism: Map[String, Any] =
-      deploymentConfig.taskParallelism.asInstanceOf[Map[String, Any]]
-    val defaultTaskParallelism: Int =
-      deploymentConfig.taskParallelismDefault.asInstanceOf[Any].asInstanceOf[Number].intValue
+    val summaryWithDefaults = deploymentConfig.summary.copy(
+      target = Some(
+        deploymentConfig.summary.target
+          .getOrElse(TableRef(volumeCatalog, volumeSchema, SummaryConfig.DefaultTable))
+      )
+    )
+    val summaryConfigJson: String = jsonMapper.writeValueAsString(summaryWithDefaults)
 
     val jobs: Map[String, Job] = catalogs.map { catalog =>
       val catalogName = catalog.id.name
-      val workerCount: Int = rawTaskParallelism.get(catalogName) match {
-        case Some(n) => n.asInstanceOf[Number].intValue
-        case None    => defaultTaskParallelism
-      }
+      val workerCount: Int = deploymentConfig.taskParallelism(catalogName)
       val cfg = CatalogJobConfig(
         jobCluster = buildJobCluster(catalogName),
         schedule = jobSchedules.get(catalogName),
         continuous = jobContinuous.get(catalogName),
         workerCount = workerCount,
-        monitoringJson = monitoringJson
+        orchestratorConfigJson = orchestratorConfigJson,
+        summaryConfigJson = summaryConfigJson
       )
       CatalogWorkflowBuilder.buildJob(catalog, cfg, jarPath, configFilePath)
     }.toMap
@@ -257,7 +263,7 @@ case class AssetDirectory(
         val tIt = tasks.elements()
         while (tIt.hasNext) {
           val task = tIt.next()
-          if (task.isObject && task.path("task_key").asText() == TaskNames.SummaryTaskKey) {
+          if (task.isObject && task.path("task_key").asText() == SummaryEntryPoint.Summary) {
             task.asInstanceOf[ObjectNode].put("run_if", "ALL_DONE")
           }
         }

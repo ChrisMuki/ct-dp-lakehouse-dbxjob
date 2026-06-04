@@ -1,20 +1,19 @@
-package ct.dna.lakehouse.core.jobs.orchestrator
+package ct.dna.lakehouse.core.lakehousejob
 
+import ct.dna.lakehouse.core.lakehousejob.orchestration.JobSetupTask
 import ct.dna.lakehouse.core.model.TableID
 import ct.dna.lakehouse.dm_md.{`package` => dmCatalog}
 import org.scalatest.funsuite.AnyFunSuite
 
-/** Exercises `CatalogOrchestrator.buildPlan` against the real `dm_md` catalog.
+/** Exercises `PlanBuilder.buildPlan` against the real `dm_md` catalog.
   *
   * `dm_md` is small but has intra-catalog edges (`mdm`, `mdp` depend on `mara`/`makt`/`t023t`/...) and cross-catalog edges (every base table pulls from `sr`).
   * The cross-catalog edges must be filtered out of the dependency graph so each catalog can be deployed as a self-contained Databricks job.
-  *
-  * Test placed in the same package as `buildPlan` to access its `private[orchestrator]` visibility.
   */
-class CatalogOrchestratorBuildPlanTest extends AnyFunSuite {
+class LakehouseJobBuildPlanTest extends AnyFunSuite {
 
   test("buildPlan returns a topologically sorted plan with cross-catalog parents filtered") {
-    val (plan, descendants) = CatalogOrchestrator.buildPlan(dmCatalog)
+    val (plan, descendants) = JobSetupTask.buildPlan(dmCatalog)
 
     assert(plan.nonEmpty, "dm_md is expected to contain at least one TableSpec")
 

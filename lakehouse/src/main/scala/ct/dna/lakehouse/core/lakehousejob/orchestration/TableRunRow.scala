@@ -1,11 +1,13 @@
-package ct.dna.lakehouse.core.jobs.orchestrator
+package ct.dna.lakehouse.core.lakehousejob.orchestration
 
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.sql.Timestamp
 
+import scala.jdk.CollectionConverters.SeqHasAsJava
 import scala.util.Try
 
+import ct.dna.lakehouse.core.lakehousejob.config.OrchestratorConfig
 import ct.dna.utils.logging.LoggingTrait
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.SparkSession
@@ -20,7 +22,7 @@ import org.apache.spark.sql.types._
   * Workers buffer their own outcomes in memory and append them as one batched write at task end (so we never do per-table Delta commits — see
   * [[TableRunsWriter.appendBatch]]). Summary appends an extra batch for SKIPPED rows that no Worker ever picked up (e.g. when JobSetup itself failed).
   */
-private[orchestrator] final case class TableRunRow(
+private[lakehousejob] final case class TableRunRow(
     runId: String,
     catalog: String,
     schema: String,
@@ -37,13 +39,13 @@ private[orchestrator] final case class TableRunRow(
   def durationSeconds: Long = math.max(0L, (endedAtMs - startedAtMs) / 1000L)
 }
 
-private[orchestrator] object TableRunRow {
+private[lakehousejob] object TableRunRow {
 
   val Status_Updated: String = "UPDATED"
   val Status_Failed: String = "FAILED"
   val Status_Skipped: String = "SKIPPED"
 
-  /** Worker was cancelled by the WorkerPool watchdog after exceeding `MonitoringConfig.maxTableRuntimeSeconds`. */
+  /** Worker was cancelled by the WorkerPool watchdog after exceeding `OrchestratorConfig.maxTableRuntimeSeconds`. */
   val Status_TimedOut: String = "TIMED_OUT"
 
   def stackTraceOf(t: Throwable): String = {
@@ -54,7 +56,7 @@ private[orchestrator] object TableRunRow {
 }
 
 /** Spark-side writer for the per-table results Delta table. Wrapped in `Try.recover` so a Delta-side outage never masks the run outcome. */
-private[orchestrator] object TableRunsWriter extends LoggingTrait {
+private[lakehousejob] object TableRunsWriter extends LoggingTrait {
 
   private val schema: StructType = StructType(
     Seq(
@@ -74,30 +76,19 @@ private[orchestrator] object TableRunsWriter extends LoggingTrait {
     )
   )
 
-  /** Resolves the fully-qualified table name from `MonitoringConfig` summaryCatalog/summarySchema (which `AssetDirectory` defaults to the deployment's
-    * volumeCatalog/volumeSchema). Returns `None` when either coordinate is missing — caller treats as "feature disabled".
-    */
-  def resolveTableFqn(cfg: MonitoringConfig): Option[String] =
-    for {
-      catalog <- cfg.summaryCatalog
-      schema <- cfg.summarySchema
-    } yield s"$catalog.$schema.${cfg.tableRunsTable}"
-
   /** Append a batch of rows. Caller owns enabling/disabling via `cfg.tableRunsEnabled`. No-op for empty input. Best-effort: a Delta failure is logged at WARN
     * and swallowed.
     */
-  def appendBatch(cfg: MonitoringConfig, rows: Iterable[TableRunRow]): Unit = {
+  def appendBatch(cfg: OrchestratorConfig, rows: Seq[TableRunRow]): Unit = {
     if (rows.isEmpty) return
-    val tableFqn = resolveTableFqn(cfg).getOrElse {
-      logger.warn("Table-runs catalog/schema not configured (summaryCatalog/summarySchema=None) — skipping per-table Delta write")
+    if (cfg.tableRuns.isEmpty) {
+      logger.warn("Table-runs table not configured (tableRuns=None) — skipping per-table Delta write")
       return
     }
+    val tableFqn = cfg.tableRuns.map(_.fqn).get
     Try {
-      val spark = SparkSession.active
-      ensureTable(spark, tableFqn)
-      val javaRows = new java.util.ArrayList[Row](rows.size)
-      rows.foreach(r => javaRows.add(toRow(r)))
-      val df = spark.createDataFrame(javaRows, schema)
+      ensureTable(tableFqn)
+      val df = SparkSession.active.createDataFrame(rows.map(toRow(_)).asJava, schema)
       df.write.format("delta").mode("append").saveAsTable(tableFqn)
       logger.info(s"Appended ${rows.size} table-run row(s) to $tableFqn")
     }.recover { case t: Throwable =>
@@ -106,8 +97,8 @@ private[orchestrator] object TableRunsWriter extends LoggingTrait {
     ()
   }
 
-  private def ensureTable(spark: SparkSession, tableFqn: String): Unit = {
-    spark.sql(
+  private def ensureTable(tableFqn: String): Unit = {
+    SparkSession.active.sql(
       s"""CREATE TABLE IF NOT EXISTS $tableFqn (
          |  run_id STRING,
          |  catalog STRING,

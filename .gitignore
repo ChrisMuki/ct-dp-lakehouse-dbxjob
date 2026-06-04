@@ -23,11 +23,6 @@ run-all-tables.sh
 
 # ignore secrets
 cicd/src/main/resources/*.json
-cicd/src/main/resources/deployment/configFiles/*.json
-!cicd/src/main/resources/deployment/configFiles/template.json
-
-# ignore per-user local overrides for the deployment config (deep-merged on top of <stage>.json)
-devops/src/main/resources/deployment/configFiles/*.local.json
 
 # ignore databricks 
 .databricks/*

@@ -1,99 +1,61 @@
-package ct.dna.lakehouse.core.jobs.orchestrator
+package ct.dna.lakehouse.core.lakehousejob.summary
 
 import java.sql.Timestamp
 
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
+import ct.dna.lakehouse.core.catalog.TableFQN
+import ct.dna.lakehouse.core.lakehousejob.SharedState
+import ct.dna.lakehouse.core.lakehousejob.TableOutcome
+import ct.dna.lakehouse.core.lakehousejob.config.SummaryConfig
 import ct.dna.lakehouse.core.model.TableID
 import ct.dna.lakehouse.core.runtime.PoolStrategy
 import ct.dna.lakehouse.core.runtime.SparkEnv
-import ct.dna.lakehouse.core.runtime.implicits._
-import ct.dna.utils.json.mapper
-import ct.dna.utils.logging.LoggingTrait
-import ct.dna.utils.logging.PrintlnAppender
-import ct.dna.utils.runtime.Configuration
+import ct.dna.utils.ExecuteOnce
+import ct.dna.utils.runtime.Task
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 
-/** Body of the "Summary" task ([[OrchestratorTask.Summary]]).
-  *
-  * Terminal observer. Runs with Databricks `run_if: ALL_DONE`, i.e. after every Worker and the Monitor have completed regardless of outcome. Two
-  * responsibilities:
-  *
-  *   1. Append a per-run row to the configurable summary Delta table (`<summaryCatalog>.<summarySchema>.<summaryTable>`). The catalog and schema default to the
-  *      deployment's `volumeCatalog` / `volumeSchema` so no extra Unity Catalog provisioning is required for the typical case. Disabled when
-  *      `MonitoringConfig.summaryEnabled = false`.
-  *   1. Emit the stable single-line `SUMMARY` log row consumed by grep / dashboard tooling and re-raise any `JobSetup` error so the task itself fails — giving
-  *      operators a single failure surface to alert on.
-  *
-  * The Delta write is wrapped in `Try.recover` so a summary-table outage never masks the actual run outcome.
-  */
-private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
+/** Terminal observer task: writes the per-run row to the summary Delta table and emits the final SUMMARY log line. */
+final case class SummaryTask() extends Task {
 
-  /** Schema of the summary table. Kept here (not in a SQL DDL string) so `CREATE TABLE IF NOT EXISTS` works without DBR-version-specific syntax and the column
-    * list survives Delta schema evolution.
-    */
-  private val summarySchema: StructType = StructType(
-    Seq(
-      StructField("run_id", StringType, nullable = true),
-      StructField("catalog", StringType, nullable = true),
-      StructField("started_at", TimestampType, nullable = true),
-      StructField("ended_at", TimestampType, nullable = true),
-      StructField("duration_seconds", LongType, nullable = true),
-      StructField("status", StringType, nullable = true),
-      StructField("total_recorded", IntegerType, nullable = true),
-      StructField("updated", IntegerType, nullable = true),
-      StructField("failed", IntegerType, nullable = true),
-      StructField("skipped", IntegerType, nullable = true),
-      StructField("queue_remaining", IntegerType, nullable = true),
-      StructField("setup_error", StringType, nullable = true),
-      StructField("failed_tables", StringType, nullable = true)
-    )
-  )
+  lazy val runId: String = SharedState.jobRunId
+  override val name: String = getClass.getSimpleName
+  override val uid: String = s"$name-$runId"
 
-  def run(task: OrchestratorTask.Summary): Unit = {
-    PrintlnAppender.replaceConsoleAppendersWithPrintlnAppenders()
+  protected val cleanUpDuringShutdown: ExecuteOnce[Unit] = ExecuteOnce {
+    logger.info(s"$name shutdown hook triggered")
+  }
 
-    val parsed = Configuration
-      .required("rootDir")
-      .required("monitoringConfig")
-      .withSparkConfig
-      .build(task.runtimeArgs)
-    SparkEnv.ensureInitialized(parsed.getSparkConfig)
+  override def start(): Unit = {
+
+    SparkEnv.ensureInitialized(SharedState.sparkConfig)
     SparkEnv.setPoolStrategy(PoolStrategy.Layered("lakehouse"))
 
-    val cfg = Option(CatalogOrchestrator.monitoringConfig.get())
-      .orElse {
-        // Fallback for runs where Summary starts in a fresh REPL/JVM and cannot see JobSetup's in-memory singleton state.
-        Try(mapper.readValue[MonitoringConfig](parsed.getProperty("monitoringConfig"))).toOption
-      }
-      .getOrElse {
-        throw new IllegalStateException(
-          "MonitoringConfig not set — neither CatalogOrchestrator state nor runtime monitoringConfig could be resolved."
-        )
-      }
-    val catalogName = Option(CatalogOrchestrator.catalogSpec.get()).map(_.id.name).getOrElse("<unknown>")
-    val runId = Option(CatalogOrchestrator.runId.get()).getOrElse(task.runId)
+    val initialized: Boolean = SharedState.isInitialized
 
-    val total = CatalogOrchestrator.results.size()
-    val updated = CatalogOrchestrator.completedCount
-    val failed = CatalogOrchestrator.failedCount
-    val skipped = CatalogOrchestrator.skippedCount
-    val remaining = CatalogOrchestrator.queue.size
-    val setupErr = Option(CatalogOrchestrator.setupError.get())
+    val cfg = SharedState.summaryConfig
+
+    val catalogName = SharedState.catalogSpec.id.name
+
+    val total = SharedState.results.size()
+    val updated = SharedState.completedCount
+    val failed = SharedState.failedCount
+    val skipped = SharedState.skippedCount
+    val remaining = if (initialized) SharedState.queue.size else 0
+
     val status =
-      if (setupErr.isDefined) "SETUP_FAILED"
-      else if (failed > 0) "PARTIAL"
+      if (failed > 0) "PARTIAL"
       else if (remaining > 0) "INCOMPLETE"
       else "OK"
 
     val nowMs = System.currentTimeMillis()
-    val startMs = Option(CatalogOrchestrator.runStartMs.get()).map(_.longValue()).getOrElse(nowMs)
+    val startMs = if (initialized) SharedState.runStartMs else nowMs
     val durationSec = (nowMs - startMs) / 1000L
 
-    val resultsSnapshot = CatalogOrchestrator.results.asScala.toMap
+    val resultsSnapshot = SharedState.results.asScala.toMap
 
     val updatedEntries: Seq[TableID] = resultsSnapshot.iterator
       .collect { case (id, TableOutcome.Updated) => id }
@@ -121,7 +83,6 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
         .mkString(" | ")
     } else ""
 
-    // Multi-line, operator-friendly report. Emitted BEFORE the stable single-line SUMMARY so dashboard scrapers still match.
     logger.info(
       formatReport(
         runId = runId,
@@ -135,7 +96,6 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
         failed = failed,
         skipped = skipped,
         remaining = remaining,
-        setupErr = setupErr,
         updatedEntries = updatedEntries,
         failedEntries = failedEntries,
         skippedEntries = skippedEntries
@@ -145,11 +105,10 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
     // Stable single-line summary — keep field order identical to dashboard scrapers.
     logger.info(
       s"SUMMARY catalog=$catalogName runId=$runId status=$status duration=${durationSec}s recorded=$total " +
-        s"updated=$updated failed=$failed skipped=$skipped queueRemaining=$remaining " +
-        s"setupError=${setupErr.map(_.getClass.getSimpleName).getOrElse("none")}"
+        s"updated=$updated failed=$failed skipped=$skipped queueRemaining=$remaining"
     )
 
-    if (cfg.summaryEnabled) {
+    if (cfg.enabled) {
       writeSummaryRow(
         cfg = cfg,
         runId = runId,
@@ -163,21 +122,38 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
         failed = failed,
         skipped = skipped,
         remaining = remaining,
-        setupErrName = setupErr.map(_.getClass.getSimpleName).orNull,
         failedTables = if (failedTables.isEmpty) null else failedTables
       )
     } else {
-      logger.info("Summary Delta write skipped (summaryEnabled=false)")
+      logger.info("Summary Delta write skipped (enabled=false)")
     }
 
-    // Re-raise a JobSetup error so the Summary task itself fails — gives operators a single failure surface to alert on.
-    setupErr.foreach { t =>
-      throw new RuntimeException(s"JobSetup failed earlier in this run: ${t.getMessage}", t)
-    }
+    // Summary is a pure terminal observer: it reports the run outcome and writes the per-run Delta row, but never
+    // fails its own task and never logs failures. The WorkerPool task is the single place that turns the Databricks
+    // run RED and logs the failure surface. Because Summary runs with `run_if: ALL_DONE`, it still executes — and
+    // stays GREEN — even after WorkerPool has failed.
   }
 
+  private val summarySchema: StructType = StructType(
+    Seq(
+      StructField("run_id", StringType, nullable = true),
+      StructField("catalog", StringType, nullable = true),
+      StructField("started_at", TimestampType, nullable = true),
+      StructField("ended_at", TimestampType, nullable = true),
+      StructField("duration_seconds", LongType, nullable = true),
+      StructField("status", StringType, nullable = true),
+      StructField("total_recorded", IntegerType, nullable = true),
+      StructField("updated", IntegerType, nullable = true),
+      StructField("failed", IntegerType, nullable = true),
+      StructField("skipped", IntegerType, nullable = true),
+      StructField("queue_remaining", IntegerType, nullable = true),
+      StructField("setup_error", StringType, nullable = true),
+      StructField("failed_tables", StringType, nullable = true)
+    )
+  )
+
   private def writeSummaryRow(
-      cfg: MonitoringConfig,
+      cfg: SummaryConfig,
       runId: String,
       catalogName: String,
       startMs: Long,
@@ -189,20 +165,12 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       failed: Int,
       skipped: Int,
       remaining: Int,
-      setupErrName: String,
       failedTables: String
   ): Unit = {
-    // The deployment-side `AssetDirectory` is responsible for filling these from `volumeCatalog` / `volumeSchema`
-    // before the orchestrator config is serialised, so by the time we get here both should be non-empty for any real run.
-    val catalog = cfg.summaryCatalog.getOrElse {
-      logger.warn("Summary catalog not configured (summaryCatalog=None) — skipping Delta write")
+    val tableFqn = cfg.target.map(_.fqn).getOrElse {
+      logger.warn("Summary table not configured (target=None) — skipping Delta write")
       return
     }
-    val schema = cfg.summarySchema.getOrElse {
-      logger.warn("Summary schema not configured (summarySchema=None) — skipping Delta write")
-      return
-    }
-    val tableFqn = s"$catalog.$schema.${cfg.summaryTable}"
 
     Try {
       val spark = SparkSession.active
@@ -236,7 +204,7 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
         Integer.valueOf(failed),
         Integer.valueOf(skipped),
         Integer.valueOf(remaining),
-        setupErrName,
+        "",
         failedTables
       )
       val df = spark.createDataFrame(java.util.Arrays.asList(row), summarySchema)
@@ -254,10 +222,9 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
   private val MaxSkippedListed: Int = 50
   private val MaxPerTableListed: Int = 200
 
-  private def idLabel(id: TableID): String = s"${id.schemaId.catalogId.name}.${id.schemaId.name}.${id.name}"
+  private def idLabel(id: TableID): String = TableFQN(id.catalog, id.schema, id.name).fqn
 
-  /** Build a human-friendly multi-line report. Stable single-line `SUMMARY` is logged separately for scrapers. */
-  private[orchestrator] def formatReport(
+  private[lakehousejob] def formatReport(
       runId: String,
       catalogName: String,
       status: String,
@@ -269,7 +236,6 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       failed: Int,
       skipped: Int,
       remaining: Int,
-      setupErr: Option[Throwable],
       updatedEntries: Seq[TableID],
       failedEntries: Seq[(TableID, Throwable)],
       skippedEntries: Seq[(TableID, TableID)]
@@ -297,10 +263,6 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
     sb.append(f"    failed     : $failed%6d%n")
     sb.append(f"    skipped    : $skipped%6d   (descendant of a failed table)%n")
     sb.append(f"  Queue remain : $remaining%6d   (not picked up before pool drained)%n")
-    setupErr.foreach { t =>
-      sb.append("  --------------------------------------------------------------------------------\n")
-      sb.append(s"  SETUP ERROR  : ${t.getClass.getName}: ${Option(t.getMessage).getOrElse("<no message>")}\n")
-    }
 
     if (failedEntries.nonEmpty) {
       sb.append("  --------------------------------------------------------------------------------\n")
@@ -336,9 +298,6 @@ private[orchestrator] object SummaryTaskRunner extends LoggingTrait {
       }
     }
 
-    // Compact per-table list: one line per table, status prefix. Useful when the catalog is small enough
-    // (< MaxPerTableListed); for larger catalogs we already have the failure/skip sections above and the
-    // full record lives in the table_runs Delta table.
     val allEntries: Seq[(TableID, String)] =
       updatedEntries.map(id => id -> "OK") ++
         failedEntries.map { case (id, _) => id -> "FAIL" } ++
