@@ -1,6 +1,7 @@
 package ct.dna.lakehouse.core.lakehousejob.config
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import ct.dna.lakehouse.core.catalog.TableFQN
 
 /** Runtime knobs consumed by the Orchestrator: the live-status cadence, the per-table watchdog and the per-table results Delta table it flushes at the end of
   * the run. Parsed by `JobSetup` from the `orchestratorConfig=<json>` argument and published into [[ct.dna.lakehouse.core.lakehousejob.SharedState]].
@@ -19,10 +20,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
   */
 @JsonIgnoreProperties(ignoreUnknown = true)
 final case class OrchestratorConfig(
-    statusIntervalSeconds: Int = 60,
-    maxTableRuntimeSeconds: Option[Long] = None,
-    tableRuns: Option[TableRef] = None,
-    tableRunsEnabled: Boolean = true
+    statusIntervalSeconds: Int,
+    maxTableRuntimeSeconds: Option[Long],
+    tableRuns: Option[TableFQN],
+    tableRunsEnabled: Boolean
 ) {
   require(statusIntervalSeconds > 0, "statusIntervalSeconds must be positive")
   require(maxTableRuntimeSeconds.forall(_ > 0), "maxTableRuntimeSeconds must be positive when defined")

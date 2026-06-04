@@ -54,7 +54,7 @@ All fields except `host` are required on the `Config` case class in [`Config.sca
 | `volumeSchema` | `default` | UC schema in the volume path |
 | `targetMode` | `production` | `development` makes the CLI prefix the job name with `[dev <user>]` and run the job as the deploying identity |
 | `clusterConfiguration` | see below | Global job-cluster shape |
-| `clusterConfigurations` | `{}` | **Per-catalog** overrides on top of `clusterConfiguration` |
+| `clusterConfigurationOverrides` | `{}` | **Per-catalog** overrides on top of `clusterConfiguration` |
 | `schedules` | `{}` | Per-catalog Quartz cron schedules |
 | `continuous` | `{}` | Per-catalog continuous-run config (mutually exclusive with `schedules` for the same catalog) |
 | `taskParallelism` | `{}` default `4` | In-JVM table-parallelism per catalog (not the Spark worker count); a map with a default value for unlisted catalogs |
@@ -62,7 +62,7 @@ All fields except `host` are required on the `Config` case class in [`Config.sca
 | `summary` | see below | Runtime knobs for the terminal Summary step |
 | `permissions` | `[]` | Target-level permissions emitted into the bundle |
 
-### `clusterConfiguration` / `clusterConfigurations.<catalog>`
+### `clusterConfiguration` / `clusterConfigurationOverrides.<catalog>`
 
 | Field | Default | Notes |
 |---|---|---|
@@ -73,7 +73,7 @@ All fields except `host` are required on the `Config` case class in [`Config.sca
 | `driverNodeTypeId` | `Standard_D8ds_v5` | Driver VM size |
 | `sparkConf` | `spark.sql.autoBroadcastJoinThreshold=-1` + adaptive variant | Merged into `new_cluster.spark_conf`. Per-catalog `sparkConf` entries shallow-merge over the global map (per-catalog wins on key collisions). |
 
-The per-catalog overrides under `clusterConfigurations` are all optional — absent fields inherit from the global `clusterConfiguration`. Use this to give layers with different workload shapes their own cluster profile (e.g. `sr` = many small tables, `dm_md` = few large tables).
+The per-catalog overrides under `clusterConfigurationOverrides` are all optional — absent fields inherit from the global `clusterConfiguration`. Use this to give layers with different workload shapes their own cluster profile (e.g. `sr` = many small tables, `dm_md` = few large tables).
 
 ### `schedules.<catalog>` / `continuous.<catalog>`
 

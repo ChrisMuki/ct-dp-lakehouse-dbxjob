@@ -4,6 +4,7 @@ import ct.dna.lakehouse.cicd.Config.ClusterConfiguration
 import ct.dna.lakehouse.cicd.Config.ClusterConfigurationOverride
 import ct.dna.lakehouse.cicd.Config.PermissionConfig
 import ct.dna.lakehouse.cicd.Config.ScheduleConfig
+import ct.dna.lakehouse.core.catalog.TableFQN
 import ct.dna.lakehouse.core.lakehousejob.config.OrchestratorConfig
 import ct.dna.lakehouse.core.lakehousejob.config.SummaryConfig
 
@@ -26,7 +27,7 @@ case class Config(
       * Use to tune executor/driver size and shuffle config differently for catalogs whose workloads differ a lot in table-size distribution (e.g. SR = many
       * small tables, DM = few large tables).
       */
-    clusterConfigurations: Map[String, ClusterConfigurationOverride],
+    clusterConfigurationOverrides: Map[String, ClusterConfigurationOverride],
     /** Per-catalog cron schedules, keyed by catalog name (e.g. "sr", "dm_md"). Catalogs without an entry are deployed unscheduled (triggered manually or via
       * API). Use this to give each layer its own cadence.
       */
@@ -69,13 +70,17 @@ object Config {
   def stageConfig: Config = {
     import Stage.dqp
 
-    // DM/MD (and the dw_tx mirror): prod gives them a smaller worker + driver than the big SR profile and halves the
-    // partition count; dev/qual just run on the shared single worker with no extra knobs.
+    // DM/MD (and the dw_tx mirror): prod gives them a smaller worker + driver than the big SR profile, with a matching
+    // smaller AQE partition count (E32ds_v5 -> 128); dev/qual inherit the global worker + count.
     val dmAndDwOverride = ClusterConfigurationOverride(
       maxWorkerNodes = Some(1),
       nodeTypeId = dqp(None, None, Some("Standard_E32ds_v5")),
       driverNodeTypeId = dqp(None, None, Some("Standard_E8ds_v5")),
-      sparkConf = dqp(Map.empty, Map.empty, Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "128"))
+      sparkConf = dqp(
+        Map.empty,
+        Map.empty,
+        Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "128")
+      )
     )
 
     // Same cron per catalog across stages; only the pause status differs (dev/qual deploy paused, prod runs).
@@ -98,26 +103,38 @@ object Config {
         sparkVersion = "17.3.x-scala2.13",
         clusterPolicyId = Some(dqp("000AC9F2923A51E1", "001F2C351BFE187D", "0009D8E7AF32CDAF")),
         // Fixed-size cluster: maxWorkerNodes=1 emits autoscale(1,1) -> exactly one worker, still satisfying the policy's
-        // SHOULD_USE_AUTOSCALING_INFO requirement. dev/qual: one small E8ds_v5 (8 vCPU). prod: one big E96ds_v5 (96 vCPU).
+        // SHOULD_USE_AUTOSCALING_INFO requirement.
         maxWorkerNodes = 1,
+        // dev/qual: one small E8ds_v5 (8 vCPU). prod: one big E96ds_v5 (96 vCPU).
         nodeTypeId = dqp("Standard_E8ds_v5", "Standard_E8ds_v5", "Standard_E96ds_v5"),
         driverNodeTypeId = dqp("Standard_E8ds_v5", "Standard_E8ds_v5", "Standard_E16ds_v5"),
-        // Shared across all stages; only the AQE initial-partition count and the cache/window knob differ (prod runs on a
-        // much bigger worker, so it scales partitions up and swaps the Delta-cache hint for the aggressive-window-down hint).
+        // Shared across all stages; only the AQE initial-partition count differs (sized to the worker: 8c -> 32, 96c -> 384).
+        // Behavioural knobs (Delta write layout, disk cache) are kept identical across stages so dev/qual exercise the same
+        // write/merge behaviour prod relies on; only genuine sizing (partition count, node type) varies per stage.
         sparkConf = Map(
           "spark.scheduler.mode" -> "FAIR",
           "spark.sql.autoBroadcastJoinThreshold" -> "33554432",
           "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "33554432",
           "spark.sql.adaptive.coalescePartitions.minPartitionSize" -> "16MB",
-          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> dqp("32", "32", "384"),
-          "spark.sql.objectHashAggregate.sortBased.fallbackThreshold" -> "4096"
+          "spark.sql.objectHashAggregate.sortBased.fallbackThreshold" -> "4096",
+          // Behavioural Delta write knobs — identical across stages so dev/qual produce the same output file
+          // layout as prod (optimizeWrite coalesces the fan-out, autoCompact compacts small files afterwards).
+          // Cheap no-ops on the tiny dev/qual data; essential on the large prod MERGEs.
+          "spark.databricks.delta.optimizeWrite.enabled" -> "true",
+          "spark.databricks.delta.autoCompact.enabled" -> "true",
+          // Disk cache: perf-only (no correctness impact). On in every stage to avoid env drift.
+          "spark.databricks.io.cache.enabled" -> "true"
         ) ++ dqp(
-          dev = Map("spark.databricks.io.cache.enabled" -> "true"),
-          qual = Map("spark.databricks.io.cache.enabled" -> "true"),
-          prod = Map("spark.databricks.aggressiveWindowDownS" -> "600")
+          dev = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "32"),
+          qual = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "32"),
+          // initialPartitionNum sized to the big prod worker; aggressiveWindowDownS only matters on prod's autoscale-release.
+          prod = Map(
+            "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "384",
+            "spark.databricks.aggressiveWindowDownS" -> "600"
+          )
         )
       ),
-      clusterConfigurations = Map(
+      clusterConfigurationOverrides = Map(
         // sr keeps the MERGE materialize-source knob off in dev/qual (cheap small MERGEs); prod drops it.
         "sr" -> ClusterConfigurationOverride(
           maxWorkerNodes = Some(1),
@@ -146,8 +163,16 @@ object Config {
         PermissionConfig(groupName = dqp("dev_lakehouse_workspace_devops", "qual_lakehouse_workspace_devops", "lakehouse_workspace_devops"), level = "CAN_RUN")
       ),
       // statusInterval (60s) is the OrchestratorConfig default; only prod arms the per-table watchdog (20 min).
-      orchestrator = OrchestratorConfig(maxTableRuntimeSeconds = dqp(None, None, Some(1200L))),
-      summary = SummaryConfig(),
+      orchestrator = OrchestratorConfig(
+        statusIntervalSeconds = 60,
+        maxTableRuntimeSeconds = dqp(None, None, Some(1200L)),
+        tableRuns = dqp(None, None, Some(TableFQN("default_catalog", "default_schema", "lakehouse_table_runs"))),
+        tableRunsEnabled = dqp(true, true, true)
+      ),
+      summary = SummaryConfig(
+        target = dqp(None, None, Some(TableFQN("default_catalog", "default_schema", "lakehouse_run_summaries"))),
+        enabled = dqp(true, true, true)
+      ),
       taskParallelism = dqp(
         dev = Map("sr" -> 20, "dm_md" -> 10, "dw_tx" -> 10),
         qual = Map("sr" -> 20, "dm_md" -> 10),

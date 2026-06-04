@@ -11,9 +11,9 @@ import ct.dna.lakehouse.cicd.models.ConfigFile
 import ct.dna.lakehouse.cicd.models.InitScript
 import ct.dna.lakehouse.core.CatalogJobConfig
 import ct.dna.lakehouse.core.CatalogWorkflowBuilder
+import ct.dna.lakehouse.core.catalog.TableFQN
 import ct.dna.lakehouse.core.lakehousejob.config.OrchestratorConfig
 import ct.dna.lakehouse.core.lakehousejob.config.SummaryConfig
-import ct.dna.lakehouse.core.lakehousejob.config.TableRef
 import ct.dna.lakehouse.core.lakehousejob.summary.{EntryPoint => SummaryEntryPoint}
 import ct.dna.lakehouse.core.model.CatalogSpec
 import ct.dna.lakehouse.core.runtime.SparkConfig
@@ -91,13 +91,13 @@ case class AssetDirectory(
     logger.info("Building 'databricks.yml'")
 
     val cc = deploymentConfig.clusterConfiguration
-    val ccOverrides = deploymentConfig.clusterConfigurations
+    val ccOverrides = deploymentConfig.clusterConfigurationOverrides
     val jarPath = s"${jobResourcesLatestPath}/lakehouse.jar"
     val configFilePath = s"${jobResourcesLatestPath}/config.json"
 
     /** Build a `JobCluster` for a given catalog. One cluster is created per catalog job so each catalog can be tuned independently via
-      * `deploymentConfig.clusterConfigurations[<catalogName>]`. Per-catalog overrides win; absent fields inherit the global `clusterConfiguration`. `sparkConf`
-      * is shallow-merged (per-catalog entries override the global on key collisions).
+      * `deploymentConfig.clusterConfigurationOverrides[<catalogName>]`. Per-catalog overrides win; absent fields inherit the global `clusterConfiguration`.
+      * `sparkConf` is shallow-merged (per-catalog entries override the global on key collisions).
       */
     def buildJobCluster(catalogName: String): JobCluster = {
       val ov = ccOverrides.getOrElse(catalogName, Config.ClusterConfigurationOverride())
@@ -113,11 +113,8 @@ case class AssetDirectory(
       // Jackson stores `Option[Int]` as `Option[java.lang.Long]` due to type erasure;
       // any direct unbox-to-Int (including `.map(identity)`) throws ClassCastException.
       // Erase to `Option[Any]` first, then coerce the boxed `Number` explicitly.
-      val effectiveMaxWorkers: Int =
-        ov.maxWorkerNodes.asInstanceOf[Option[Any]] match {
-          case Some(n) => n.asInstanceOf[Number].intValue
-          case None    => cc.maxWorkerNodes
-        }
+      val effectiveMaxWorkers: Int = ov.maxWorkerNodes.getOrElse(cc.maxWorkerNodes)
+
       val effectivePolicyId = ov.clusterPolicyId.orElse(cc.clusterPolicyId)
       JobCluster(
         jobClusterKey = s"${catalogName}-cluster",
@@ -148,10 +145,11 @@ case class AssetDirectory(
           policyId = effectivePolicyId.orNull,
           workloadType = WorkloadType(clients = WorkloadTypeClients(notebooks = false, jobs = true)),
           dataSecurityMode = "SINGLE_USER",
-          // Photon disabled: the lakehouse jobs are shuffle/IO-bound (Delta merges, large SAP rebuilds)
-          // and gain little from Photon vectorisation while still paying ~2x the DBU rate. Switch back to
-          // "PHOTON" here if a workload profile changes and benchmarks justify the cost.
-          runtimeEngine = "STANDARD",
+          // Photon enabled: although the lakehouse jobs do heavy shuffle/IO (Delta merges, large SAP rebuilds),
+          // the per-task plans are also CPU-bound on vectorisable operators — SortMergeJoin, Sort, SortAggregate
+          // and the post-join Generate/explode chain on the MERGE write side — which Photon accelerates. Worth
+          // the ~2x DBU rate when wall-clock drops more than that. Switch back to "STANDARD" if benchmarks regress.
+          runtimeEngine = "PHOTON",
           kind = "CLASSIC_PREVIEW",
           isSingleNode = false,
           autoscale = Autoscale(minWorkers = 1, maxWorkers = effectiveMaxWorkers)
@@ -205,7 +203,7 @@ case class AssetDirectory(
     val orchestratorWithDefaults = deploymentConfig.orchestrator.copy(
       tableRuns = Some(
         deploymentConfig.orchestrator.tableRuns
-          .getOrElse(TableRef(volumeCatalog, volumeSchema, OrchestratorConfig.DefaultTableRunsTable))
+          .getOrElse(TableFQN(volumeCatalog, volumeSchema, OrchestratorConfig.DefaultTableRunsTable))
       )
     )
     val orchestratorConfigJson: String = jsonMapper.writeValueAsString(orchestratorWithDefaults)
@@ -213,7 +211,7 @@ case class AssetDirectory(
     val summaryWithDefaults = deploymentConfig.summary.copy(
       target = Some(
         deploymentConfig.summary.target
-          .getOrElse(TableRef(volumeCatalog, volumeSchema, SummaryConfig.DefaultTable))
+          .getOrElse(TableFQN(volumeCatalog, volumeSchema, SummaryConfig.DefaultTable))
       )
     )
     val summaryConfigJson: String = jsonMapper.writeValueAsString(summaryWithDefaults)

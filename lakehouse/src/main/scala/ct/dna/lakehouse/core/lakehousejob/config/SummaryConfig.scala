@@ -1,6 +1,7 @@
 package ct.dna.lakehouse.core.lakehousejob.config
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import ct.dna.lakehouse.core.catalog.TableFQN
 
 /** Runtime knobs consumed by the terminal Summary step: where (and whether) to write the per-run summary Delta row. Parsed by `JobSetup` from the
   * `summaryConfig=<json>` argument and published into [[ct.dna.lakehouse.core.lakehousejob.SharedState]].
@@ -13,8 +14,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
   */
 @JsonIgnoreProperties(ignoreUnknown = true)
 final case class SummaryConfig(
-    target: Option[TableRef] = None,
-    enabled: Boolean = true
+    target: Option[TableFQN],
+    enabled: Boolean
 )
 
 object SummaryConfig {

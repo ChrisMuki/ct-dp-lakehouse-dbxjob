@@ -16,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 final case class RunConfig(
     catalogClass: String,
     runId: String,
-    workerCount: Int = 4
+    workerCount: Int
 ) {
   require(workerCount >= 1, "workerCount must be >= 1")
 }
