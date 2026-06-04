@@ -33,8 +33,9 @@ jobs:
   deploy:
     name: Deploy lakehouse by ${{ github.actor }}
     runs-on: dna17-2
-    # workflow_dispatch picks the environment via input; a push to main always deploys prod.
-    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'prod' }}
+    # workflow_dispatch picks the environment via input; a push to main deploys dev only.
+    # Promotion to qual/prod is an explicit, manual workflow_dispatch run.
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'dev' }}
     permissions:
       contents: write
       id-token: write
@@ -52,11 +53,12 @@ jobs:
       - name: Determine stage
         id: stage
         run: |
-          # workflow_dispatch picks the stage via input; a push to main always deploys prod.
+          # workflow_dispatch picks the stage via input; a push to main deploys dev only.
+          # Promotion to qual/prod is an explicit, manual workflow_dispatch run.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             STAGE="${{ github.event.inputs.environment }}"
           else
-            STAGE="prod"
+            STAGE="dev"
           fi
           echo "STAGE=${STAGE}" >> $GITHUB_OUTPUT
           echo "BUILD_ID=$(date +'%Y%m%d-%H%M')-$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT

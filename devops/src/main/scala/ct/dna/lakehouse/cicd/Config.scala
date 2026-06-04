@@ -149,9 +149,9 @@ object Config {
       orchestrator = OrchestratorConfig(maxTableRuntimeSeconds = dqp(None, None, Some(1200L))),
       summary = SummaryConfig(),
       taskParallelism = dqp(
-        dev = Map("sr" -> 4, "dm_md" -> 2, "dw_tx" -> 2),
-        qual = Map("sr" -> 4, "dm_md" -> 2),
-        prod = Map("sr" -> 20, "dm_md" -> 4, "dw_tx" -> 4)
+        dev = Map("sr" -> 20, "dm_md" -> 10, "dw_tx" -> 10),
+        qual = Map("sr" -> 20, "dm_md" -> 10),
+        prod = Map("sr" -> 40, "dm_md" -> 10, "dw_tx" -> 10)
       ).withDefaultValue(dqp(2, 3, 4)),
       targetMode = "production"
     )
