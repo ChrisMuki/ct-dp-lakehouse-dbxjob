@@ -105,7 +105,7 @@ object Config {
         // Shared across all stages; only the AQE initial-partition count and the cache/window knob differ (prod runs on a
         // much bigger worker, so it scales partitions up and swaps the Delta-cache hint for the aggressive-window-down hint).
         sparkConf = Map(
-          "spark.scheduler.mode" -> "FIFO",
+          "spark.scheduler.mode" -> "FAIR",
           "spark.sql.autoBroadcastJoinThreshold" -> "33554432",
           "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "33554432",
           "spark.sql.adaptive.coalescePartitions.minPartitionSize" -> "16MB",
