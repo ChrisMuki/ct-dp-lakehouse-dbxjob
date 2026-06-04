@@ -8,9 +8,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
   * @param statusIntervalSeconds
   *   interval at which the Orchestrator logs the consolidated live status block.
   * @param maxTableRuntimeSeconds
-  *   hard cap on how long a single table update may run before the watchdog cancels its Spark job group (`runId/<catalog>.<schema>.<table>`). A cancelled table
-  *   surfaces as a `TIMED_OUT` row and its descendants are cascade-skipped. `None` (default) disables the watchdog. Recommended starting point per layer: `sr =
-  *   4h`, `dm_md = 1h`, `dw_tx = 1h` — pick ≈3× the historical P95 to avoid false positives.
+  *   hard cap on how long a single table update may run before the watchdog cancels its Spark tag. A cancelled table surfaces as a `TIMED_OUT` row and its
+  *   descendants are cascade-skipped. `None` (default) disables the watchdog. Recommended starting point per layer: `sr = 4h`, `dm_md = 1h`, `dw_tx = 1h` —
+  *   pick ≈3× the historical P95 to avoid false positives.
   * @param tableRuns
   *   Unity Catalog coordinates of the per-table results Delta table appended by every Worker. `None` until resolved at deploy time, where `AssetDirectory`
   *   defaults it to the deployment's volume catalog/schema and the [[OrchestratorConfig.DefaultTableRunsTable]] table name.

@@ -23,6 +23,7 @@ import ct.dna.utils.collections.DagQueue
 import ct.dna.utils.runtime.Task
 import ct.dna.utils.tryOrIgnore
 import org.apache.spark.sql.SparkSession
+import ct.dna.dataplatform.NamingConvention
 
 /** One worker — a single Databricks-internal [[Task]] launched by [[EntryPoint]] (one per pool thread, via its own `EntryPoint.main` call). Encapsulates all
   * thread-private state (name, [[TableRunRow]] buffer, current table, its own reused [[TableManager]] / [[UpdatedTableProcessor]]). Cross-thread state (queue,
@@ -111,7 +112,8 @@ final case class WorkerTask(idx: Int, poolSize: Int) extends Task {
     // Tag every Spark job this table submits with a unique job tag. The watchdog (a different thread) cancels exactly
     // this table by that tag. Routed through `SparkJobTags` (the upcoming `SparkEnv.tag`/`cancel`): classic uses the
     // shared SparkContext (context-global), connect the session — both reach the worker's jobs without sharing state.
-    val jobTag = WorkerTask.buildJobTag(SharedState.jobRunId, tableId)
+    val jobTag = WorkerTask.buildJobTag(tableId)
+    val jobDesc = WorkerTask.buildJobDesc(tableId)
     SparkEnv.tag(jobTag)
     SparkEnv.setDescription(tableId.toString)
 
@@ -202,8 +204,8 @@ object WorkerTask {
   /** Spark job tag identifying every job a worker submits for one table. The worker attaches it via [[SparkJobTags.tag]] and the watchdog cancels by it via
     * [[SparkJobTags.cancel]] from another thread. Must contain no comma (Spark's tag separator).
     */
-  def buildJobTag(runId: String, id: TableID): String =
-    s"$runId/$id"
+  def buildJobTag(id: TableID): String = s"${SharedState.jobRunId}/${id.catalog}.${id.schema}.${id.name}"
+  def buildJobDesc(id: TableID): String = id.catalog + "." + id.schema + "." + id.name
 
   /** Backoff between empty polls of the in-memory dependency queue. A worker only sees an empty poll while pollable tables are still blocked on ancestors other
     * workers are computing — pure local backoff to avoid busy-spinning, no I/O involved, so a small fixed value is all that's needed.

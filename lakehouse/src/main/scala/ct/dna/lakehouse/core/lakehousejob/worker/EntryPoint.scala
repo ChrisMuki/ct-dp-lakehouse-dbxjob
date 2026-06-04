@@ -101,7 +101,7 @@ object EntryPoint extends TaskEntryPoint {
         val tableId = rt.tableId
         val elapsedMs = rt.elapsedMs(nowMs)
         if (elapsedMs > limitMs && cancelledForTimeout.add(tableId)) {
-          val jobTag = WorkerTask.buildJobTag(SharedState.jobRunId, tableId)
+          val jobTag = WorkerTask.buildJobTag(tableId)
           logger.warn(s"WATCHDOG cancelling $tableId on ${w.name}: elapsed=${elapsedMs / 1000}s > limit=${limitMs / 1000}s (tag=$jobTag)")
           Try(SparkEnv.cancel(jobTag)).failed.foreach { t =>
             logger.warn(s"WATCHDOG cancel($jobTag) failed: ${t.getClass.getSimpleName}: ${t.getMessage}")
