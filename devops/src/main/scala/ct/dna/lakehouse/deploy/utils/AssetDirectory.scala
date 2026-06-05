@@ -134,7 +134,7 @@ case class AssetDirectory(
           runtimeEngine = "PHOTON",
           kind = "CLASSIC_PREVIEW",
           isSingleNode = false,
-          autoscale = Autoscale(minWorkers = 1, maxWorkers = cfg.maxWorkerNodes)
+          autoscale = Autoscale(minWorkers = cfg.minWorkerNodes, maxWorkers = cfg.maxWorkerNodes)
         )
       )
     }

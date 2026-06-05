@@ -68,6 +68,7 @@ All fields except `host` are required on the `Config` case class in [`Config.sca
 |---|---|---|
 | `sparkVersion` | `17.3.x-scala2.13` | Databricks Runtime |
 | `clusterPolicyId` | none | Optional cluster policy |
+| `minWorkerNodes` | `1` | Autoscale min workers. Keep `>= 2` for catalogs using in-memory `localCheckpoint`s so one executor loss isn't fatal. |
 | `maxWorkerNodes` | `4` | Autoscale max workers |
 | `nodeTypeId` | `Standard_D8ds_v5` | Worker VM size |
 | `driverNodeTypeId` | `Standard_D8ds_v5` | Driver VM size |

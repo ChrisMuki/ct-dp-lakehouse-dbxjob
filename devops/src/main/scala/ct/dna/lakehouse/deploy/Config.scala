@@ -72,8 +72,15 @@ object Config {
     val srConfig = CatalogConfig(
       sparkVersion = "17.3.x-scala2.13",
       clusterPolicyId = dqp("000AC9F2923A51E1", "001F2C351BFE187D", "0009D8E7AF32CDAF"),
-      maxWorkerNodes = 1,
-      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E96ds_v5"),
+      // prod: 2-3 smaller E32 workers instead of one fat E96. The single-E96 ran ~32 tables in one 96-core JVM whose
+      // ~111GB heap hit GC pauses long enough (155s) to time out the executor heartbeat; its death wiped every in-memory
+      // localCheckpoint and failed all dependent tasks (CHECKPOINT_RDD_BLOCK_ID_NOT_FOUND). Splitting the same ~64-96
+      // aggregate cores across 2-3 JVMs keeps heaps small (shorter GC) and spreads checkpoints so one executor loss is
+      // survivable. min=2 guarantees that redundancy from the start; large MERGEs are distributed sort-merge joins and
+      // scale across the smaller nodes' aggregate capacity just as well.
+      minWorkerNodes = dqp(dev_qual = 1, prod = 2),
+      maxWorkerNodes = dqp(dev_qual = 2, prod = 3),
+      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E32ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       sparkConf = Map(
         "spark.scheduler.mode" -> "FAIR",
@@ -120,7 +127,7 @@ object Config {
 
     val dmConfig = srConfig.copy(
       taskParallelism = dqp(dev_qual = 4 * 2, prod = 8 * 2),
-      nodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E32ds_v5"),
+      nodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E4ds_v5", prod = "Standard_E8ds_v5"),
       sparkConf = srConfig.sparkConf ++ dqp(
         dev_qual = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 8 * 4).toString),

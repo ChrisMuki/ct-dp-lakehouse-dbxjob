@@ -11,6 +11,11 @@ import ct.dna.utils.deploy.databrickscli.assetbundle.JobSchedule
 case class CatalogConfig(
     sparkVersion: String,
     clusterPolicyId: String,
+    /** Autoscale lower bound. Keep >= 2 for catalogs whose tables use in-memory `localCheckpoint`s: with a single worker the
+      * death of that one executor (e.g. a long GC pause) permanently loses every checkpoint block, failing all dependent
+      * tasks. Two+ workers spread the blocks so one executor loss is recoverable.
+      */
+    minWorkerNodes: Int = 1,
     maxWorkerNodes: Int,
     nodeTypeId: String = "Standard_D8ds_v5",
     /** Driver node VM size. */
