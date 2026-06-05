@@ -1,6 +1,8 @@
-package ct.dna.lakehouse.cicd
+package ct.dna.lakehouse.deploy
 
-import ct.dna.lakehouse.cicd.utils.AssetDirectory
+import ct.dna.lakehouse.deploy.Config
+import ct.dna.lakehouse.deploy.Stage
+import ct.dna.lakehouse.deploy.utils.AssetDirectory
 import ct.dna.utils.az.auth._
 import ct.dna.utils.deploy.Process
 import ct.dna.utils.logging.LoggingTrait
@@ -50,7 +52,7 @@ object Deploy extends LoggingTrait {
     assetDir.assetDir.makeEmptyDir()
     assetDir.copyLog4j2File()
     assetDir.createInitScriptSh()
-    assetDir.createConfigJson()
+    val configFiles = assetDir.createConfigFiles()
 
     val assetBundle = assetDir.createDatabricksYml()
 
@@ -69,43 +71,18 @@ object Deploy extends LoggingTrait {
       dbxProcess.execute(s"databricks fs mkdir $jobResourcesPathAsBDFS").throwOnFailure("Creating job resource path failed.")
 
       logger.info("Copying files to Databricks volume")
+      val configFileCopies = configFiles.map { cf =>
+        (assetDir.assetDir.getAbsolutePath + "/" + cf.fileName) -> s"$jobResourcesPathAsBDFS/${cf.fileName}"
+      }
       val filesToCopy = Seq(
         assetDir.assetDir.getAbsolutePath + "/log4j2.xml" -> s"$jobResourcesPathAsBDFS/log4j2.xml",
         assetDir.assetDir.getAbsolutePath + "/init_script.sh" -> s"$jobResourcesPathAsBDFS/init_script.sh",
-        assetDir.assetDir.getAbsolutePath + "/config.json" -> s"$jobResourcesPathAsBDFS/config.json",
         jarPath -> s"$jobResourcesPathAsBDFS/lakehouse.jar"
-      )
+      ) ++ configFileCopies
       filesToCopy.foreach { case (from, to) =>
         logger.info(s"Uploading $from -> $to")
         dbxProcess.execute(s"databricks fs cp $from $to --overwrite").throwOnFailure(s"Uploading '$from' to '$to' failed.")
       }
-
-      // Also publish to a stable 'latest' path so bundle variables reference a fixed, buildId-independent path.
-      val jobResourcesLatestAsBDFS = "dbfs:" + assetDir.jobResourcesLatestPath
-      dbxProcess.execute(s"databricks fs mkdir $jobResourcesLatestAsBDFS")
-      logger.info(s"Updating latest JAR: $jarPath -> $jobResourcesLatestAsBDFS/lakehouse.jar")
-      dbxProcess
-        .execute(s"databricks fs cp $jarPath $jobResourcesLatestAsBDFS/lakehouse.jar --overwrite")
-        .throwOnFailure("Uploading JAR to latest/ path failed.")
-
-      val configFilePath = assetDir.assetDir.getAbsolutePath + "/config.json"
-      logger.info(s"Updating latest config: $configFilePath -> $jobResourcesLatestAsBDFS/config.json")
-      dbxProcess
-        .execute(s"databricks fs cp $configFilePath $jobResourcesLatestAsBDFS/config.json --overwrite")
-        .throwOnFailure("Uploading config.json to latest/ path failed.")
-
-      // log4j2.xml + init_script.sh must live at the stable `latest/` path because the cluster's
-      // `initScripts` entry in databricks.yml references that fixed path (no buildId interpolation).
-      val log4j2Path = assetDir.assetDir.getAbsolutePath + "/log4j2.xml"
-      val initScriptPath = assetDir.assetDir.getAbsolutePath + "/init_script.sh"
-      logger.info(s"Updating latest log4j2: $log4j2Path -> $jobResourcesLatestAsBDFS/log4j2.xml")
-      dbxProcess
-        .execute(s"databricks fs cp $log4j2Path $jobResourcesLatestAsBDFS/log4j2.xml --overwrite")
-        .throwOnFailure("Uploading log4j2.xml to latest/ path failed.")
-      logger.info(s"Updating latest init_script: $initScriptPath -> $jobResourcesLatestAsBDFS/init_script.sh")
-      dbxProcess
-        .execute(s"databricks fs cp $initScriptPath $jobResourcesLatestAsBDFS/init_script.sh --overwrite")
-        .throwOnFailure("Uploading init_script.sh to latest/ path failed.")
 
       logger.info("Deploying Databricks bundle")
       dbxProcess.execute("databricks bundle deploy").throwOnFailure("Databricks bundle deployment failed.")

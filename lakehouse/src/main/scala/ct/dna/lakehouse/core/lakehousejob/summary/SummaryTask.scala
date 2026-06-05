@@ -108,7 +108,7 @@ final case class SummaryTask() extends Task {
         s"updated=$updated failed=$failed skipped=$skipped queueRemaining=$remaining"
     )
 
-    if (cfg.enabled) {
+    if (cfg.target.isDefined) {
       writeSummaryRow(
         cfg = cfg,
         runId = runId,
@@ -125,7 +125,7 @@ final case class SummaryTask() extends Task {
         failedTables = if (failedTables.isEmpty) null else failedTables
       )
     } else {
-      logger.info("Summary Delta write skipped (enabled=false)")
+      logger.info("Summary Delta write skipped (target=None)")
     }
 
     // Summary is a pure terminal observer: it reports the run outcome and writes the per-run Delta row, but never

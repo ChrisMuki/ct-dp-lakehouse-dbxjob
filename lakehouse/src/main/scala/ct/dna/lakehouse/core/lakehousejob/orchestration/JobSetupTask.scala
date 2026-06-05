@@ -76,20 +76,26 @@ final case class JobSetupTask() extends Task {
       sparkConfig: SparkConfig
   )
 
-  /** Parse the run identity (`runConfig`) and the two per-task config objects (`orchestratorConfig`, `summaryConfig`) plus the Spark config from the runtime
-    * args.
+  /** Parse the run identity (`catalogClass` / `workerCount` from the config file plus the runtime `runId` argument) and the two per-task config objects
+    * (`orchestratorConfig`, `summaryConfig`) plus the Spark config. Everything except `runId` is resolved from the catalog's `configFile`.
     */
   private def parseConfig(): ParsedConfigs = {
     val parsed =
       Configuration
-        .required("runConfig")
+        .required("catalogClass")
+        .required("workerCount")
+        .required("runId")
         .required("orchestratorConfig")
         .required("summaryConfig")
         .withSparkConfig
         .build(runtimeArgs)
 
     ParsedConfigs(
-      runConfig = mapper.readValue[RunConfig](parsed.getProperty("runConfig")),
+      runConfig = RunConfig(
+        catalogClass = parsed.getProperty("catalogClass"),
+        runId = parsed.getProperty("runId"),
+        workerCount = parsed.getProperty("workerCount").toInt
+      ),
       orchestratorConfig = mapper.readValue[OrchestratorConfig](parsed.getProperty("orchestratorConfig")),
       summaryConfig = mapper.readValue[SummaryConfig](parsed.getProperty("summaryConfig")),
       sparkConfig = parsed.getSparkConfig

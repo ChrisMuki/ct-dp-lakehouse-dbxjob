@@ -81,7 +81,7 @@ object OrchestratorTask extends LoggingTrait {
   /** Persist every per-table result row (when enabled) and log the final STATUS + slowest-tables blocks. Always safe to call. */
   private[lakehousejob] def flushAndReport(workers: Seq[WorkerTask], cfg: OrchestratorConfig, runId: String): Unit = {
     val allRows = workers.iterator.flatMap(_.rowBuffer.iterator).toSeq
-    if (cfg.tableRunsEnabled) TableRunsWriter.appendBatch(cfg, allRows)
+    if (cfg.tableRuns.isDefined) TableRunsWriter.appendBatch(cfg, allRows)
     logger.warn(statusBlock(Seq.empty, finalBlock = true))
     logger.warn(slowestTablesBlock(allRows, topN = 10))
   }

@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.cicd
+package ct.dna.lakehouse.deploy
 
 import ct.dna.utils.SetOnce
 
@@ -24,6 +24,12 @@ object Stage {
   def dqp[T](dev: T, qual: T, prod: T): T = active.get match {
     case Dev  => dev
     case Qual => qual
+    case Prod => prod
+  }
+
+  def dqp[T](dev_qual: T, prod: T): T = active.get match {
+    case Dev  => dev_qual
+    case Qual => dev_qual
     case Prod => prod
   }
 

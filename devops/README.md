@@ -1,6 +1,6 @@
 # Deployment — `devops` module
 
-Builds, tests, and deploys `lakehouse.jar` to Databricks as an **Asset Bundle**. The bundle is generated in-memory at deploy time by [`AssetDirectory`](src/main/scala/ct/dna/lakehouse/cicd/utils/AssetDirectory.scala) and [`CatalogWorkflowBuilder`](src/main/scala/ct/dna/lakehouse/core/CatalogWorkflowBuilder.scala) — there is no checked-in `databricks.yml`.
+Builds, tests, and deploys `lakehouse.jar` to Databricks as an **Asset Bundle**. The bundle is generated in-memory at deploy time by [`AssetDirectory`](src/main/scala/ct/dna/lakehouse/cicd/utils/AssetDirectory.scala) and [`CatalogJobBuilder`](src/main/scala/ct/dna/lakehouse/core/CatalogJobBuilder.scala) — there is no checked-in `databricks.yml`.
 
 Each catalog (`sr`, `dm_md`, `dw_tx`, …) becomes **one Databricks Job** named `lakehouse-<catalog>`, with three tasks sharing one `job_cluster`:
 
@@ -182,7 +182,7 @@ devops/
         │   │   └── AsFile.scala                 # Jackson YAML serialization helpers
         │   └── utils/AssetDirectory.scala       # Staging dir + databricks.yml generator
         └── core/
-            ├── CatalogWorkflowBuilder.scala     # Emits one DAB Job per CatalogSpec
+            ├── CatalogJobBuilder.scala     # Emits one DAB Job per CatalogSpec
             └── GenerateColumnWithNameAccessor.scala
 ```
 
@@ -192,7 +192,7 @@ devops/
 
 | Symptom | Fix |
 |---|---|
-| `Bundle validate fails` | Run `databricks bundle validate` inside the staging dir to see the full diff. Check `databricks.yml` syntax — it is generated, so the bug is usually in `AssetDirectory.scala` / `CatalogWorkflowBuilder.scala`. |
+| `Bundle validate fails` | Run `databricks bundle validate` inside the staging dir to see the full diff. Check `databricks.yml` syntax — it is generated, so the bug is usually in `AssetDirectory.scala` / `CatalogJobBuilder.scala`. |
 | `Volume already exists` | Informational — `Deploy.scala` ignores the non-zero exit and continues. |
 | `Configuring both schedule and continuous for the same catalog` | Databricks rejects this combination; remove one of the entries for the offending catalog in [`Config.scala`](src/main/scala/ct/dna/lakehouse/cicd/Config.scala). |
 | `Unknown stage '<x>'` | `Config.stageConfig` only accepts `dev`, `qual` or `prod`; check the `stage=` argument. |

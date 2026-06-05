@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.cicd.models
+package ct.dna.lakehouse.deploy.model
 
 import java.nio.file.Files
 import java.nio.file.Paths

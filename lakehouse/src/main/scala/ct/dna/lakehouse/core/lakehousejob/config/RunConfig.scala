@@ -2,7 +2,7 @@ package ct.dna.lakehouse.core.lakehousejob.config
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 
-/** Identity + sizing of one catalog run. Built inline by [[ct.dna.lakehouse.core.CatalogWorkflowBuilder]] and passed to `JobSetup` as the `runConfig=<json>`
+/** Identity + sizing of one catalog run. Assembled by `JobSetup` from the catalog's `configFile` (`catalogClass`, `workerCount`) plus the runtime `runId`
   * argument, then published into [[ct.dna.lakehouse.core.lakehousejob.SharedState]].
   *
   * @param catalogClass

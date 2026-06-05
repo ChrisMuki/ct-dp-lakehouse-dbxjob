@@ -76,8 +76,8 @@ private[lakehousejob] object TableRunsWriter extends LoggingTrait {
     )
   )
 
-  /** Append a batch of rows. Caller owns enabling/disabling via `cfg.tableRunsEnabled`. No-op for empty input. Best-effort: a Delta failure is logged at WARN
-    * and swallowed.
+  /** Append a batch of rows. Caller owns enabling/disabling via `cfg.tableRuns` (write happens only when the coordinates are set). No-op for empty input.
+    * Best-effort: a Delta failure is logged at WARN and swallowed.
     */
   def appendBatch(cfg: OrchestratorConfig, rows: Seq[TableRunRow]): Unit = {
     if (rows.isEmpty) return

@@ -1,4 +1,4 @@
-package ct.dna.lakehouse.cicd.models
+package ct.dna.lakehouse.deploy.model
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 
