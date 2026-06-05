@@ -80,7 +80,7 @@ object Config {
       // scale across the smaller nodes' aggregate capacity just as well.
       minWorkerNodes = dqp(dev_qual = 1, prod = 2),
       maxWorkerNodes = dqp(dev_qual = 2, prod = 3),
-      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E48ds_v5"),
+      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E96ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       sparkConf = Map(
         "spark.scheduler.mode" -> "FAIR",
@@ -111,14 +111,22 @@ object Config {
         "spark.databricks.delta.optimizeWrite.enabled" -> "true",
         "spark.databricks.delta.autoCompact.enabled" -> "true",
         // Disk cache: perf-only (no correctness impact). On in every stage to avoid env drift.
-        "spark.databricks.io.cache.enabled" -> "true"
+        "spark.databricks.io.cache.enabled" -> "true",
+        // Never materialize (localCheckpoint) the MERGE source. Delta's default ("auto") spools the source into an
+        // in-memory, unreplicated RDD checkpoint as a correctness guard against a *non-deterministic* source being
+        // re-scanned by the inner/outer MERGE joins. Our CDF source read is deterministic (`lastOfKey()` over an
+        // immutable input snapshot), so that guard buys nothing and costs a lot: the checkpoint both inflated the
+        // SparkPlanInfo past the 2MB listener limit (JsonMappingException spam) and, living only in executor memory,
+        // vanished when an executor died — surfacing as CHECKPOINT_RDD_BLOCK_ID_NOT_FOUND, forcing a full MERGE recompute
+        // that then blew the watchdog. "none" drops the checkpoint entirely: smaller plans, and one executor loss no
+        // longer poisons every in-flight MERGE. Uniform across stages now that prod no longer needs the "auto" guard.
+        "spark.databricks.delta.merge.materializeSource" -> "none"
       ) ++ dqp(
         dev_qual = Map(
-          "spark.databricks.delta.merge.materializeSource" -> "none",
           "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 16 * 4).toString
         ),
         prod = Map(
-          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 96 * 4).toString
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (2 * 96 * 4).toString
         )
       ),
       taskParallelism = dqp(dev_qual = 8 * 2, prod = 48),
@@ -148,7 +156,10 @@ object Config {
       dwTx = dwConfig,
       orchestrator = OrchestratorConfig(
         statusIntervalSeconds = 120,
-        maxTableRuntimeSeconds = Some(1800L),
+        // Watchdog disabled for now: let a full run complete uninterrupted to establish the real per-table P95 runtimes
+        // (the 1800s cap was firing on the large sr MERGEs before they finished). Re-enable with a data-driven cap
+        // (doc rule of thumb: sr ≈ 4h, dm_md/dw_tx ≈ 1h, ~3× observed P95) once a clean baseline exists.
+        maxTableRuntimeSeconds = None,
         tableRuns = Some(TableFQN(volumeCatalog, volumeSchema, OrchestratorConfig.DefaultTableRunsTable))
       ),
       summary = SummaryConfig(
