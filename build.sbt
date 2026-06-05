@@ -47,19 +47,6 @@ lazy val lakehouse = project
       // Test only
       "local-spark-runtime" % Test
     ),
-    // `config/` provides the committed fallback `test-config.json` so a fresh clone (or CI) can run tests without a
-    // local file. A developer may also drop a gitignored override under `src/test/resources/`. Both relativize to the
-    // same target, which makes sbt's `copyResources` abort with "Duplicate mappings". Add `config/` to the test
-    // resource path, then drop any `config/` file whose name also exists under the standard test resources, so the
-    // local override wins locally while `config/` stays the fallback in CI.
-    Test / unmanagedResourceDirectories += (ThisBuild / baseDirectory).value / "config",
-    Test / unmanagedResources := {
-      val configDir = (ThisBuild / baseDirectory).value / "config"
-      val all = (Test / unmanagedResources).value
-      val (fromConfig, fromElsewhere) = all.partition(_.relativeTo(configDir).isDefined)
-      val elsewhereNames = fromElsewhere.map(_.getName).toSet
-      fromElsewhere ++ fromConfig.filterNot(f => elsewhereNames.contains(f.getName))
-    },
     libraryDependencies ++= Seq(
       "ct.dna" %% "lakehouse-sr" % lakehouseSrVersion,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
@@ -95,7 +82,11 @@ lazy val devops = project
 // want notebooks to import code from another subproject.
 lazy val almond = project
   .in(file("almond"))
-  .dependsOn(lakehouse)
+  // `compile->compile` for lakehouse main code; `compile->test` so notebooks (and the
+  // local sandbox under `almond/src/main/.../local`) can use lakehouse test utilities
+  // (TestForTable, testutils) and test resources (default-config.json, local-config.json,
+  // the *.xlsx fixtures) directly on the Almond kernel's compile classpath.
+  .dependsOn(lakehouse % "compile->compile;compile->test")
   .settings(
     name := "almond",
     run / fork := true,

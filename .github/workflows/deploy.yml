@@ -64,7 +64,7 @@ jobs:
           echo "BUILD_ID=$(date +'%Y%m%d-%H%M')-$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
 
       # One sbt invocation: compile + tests + assembly + stage. `sparkConfig` is read by `Configuration` from the
-      # environment (it wins over any local `test-config.json`) so `TestWithSpark` can spin up a `LocalSpark` session
+      # environment (it wins over any local `local-config.json`) so `TestWithSpark` can spin up a `LocalSpark` session
       # inside the runner without committing a config file. Use the repo variable so the value is centrally managed
       # (mirrors the pattern in `libraries/.github/workflows/pr.yml`).
       - name: Build (test + assembly + stage)

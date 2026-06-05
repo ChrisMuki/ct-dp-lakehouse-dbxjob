@@ -35,7 +35,7 @@
         "ms-azuretools.vscode-docker",
         "redhat.vscode-yaml",
         "ms-vscode.azurecli",
-        "scalameta.metals@1.59.0",
+        "scalameta.metals@1.66.0",
         "mhutchie.git-graph",
         "opentofu.vscode-opentofu"
       ]

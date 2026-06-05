@@ -10,11 +10,9 @@
     <Root level="ERROR">
       <AppenderRef ref="console.always" />
     </Root>
-    <Logger name="ct.dna" level="info" additivity="false">
-      <AppenderRef ref="console.always" />
+    <Logger name="ct.dna" level="info" additivity="true">
     </Logger>
-    <Logger name="ct.dna.utils.runtime" level="debug" additivity="false">
-      <AppenderRef ref="console.always" />
+    <Logger name="ct.dna.utils.runtime" level="debug" additivity="true">
     </Logger>
   </Loggers>
 </Configuration>

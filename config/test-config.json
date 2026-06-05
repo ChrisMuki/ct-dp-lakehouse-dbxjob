@@ -1,7 +1,0 @@
-{
-  "sparkConfig": {
-    "clazz": "LocalSpark",
-    "master": "local[*]",
-    "ephemeralRoot": "/tmp/lakehouse-test-spark"
-  }
-}

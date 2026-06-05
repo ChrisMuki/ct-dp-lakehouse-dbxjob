@@ -1,13 +1,12 @@
-package ct.dna.lakehouse.core.testutils
+package ct.dna.lakehouse.core
 
+import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits.ConfigurationBuilderHasSparkConfig
 import ct.dna.lakehouse.core.runtime.implicits.ConfigurationHasSparkConfig
-import ct.dna.utils.Hash
 import ct.dna.utils.runtime.Configuration
+import org.apache.spark.sql.SparkSession
 
-object TestConfig {
-  val hash = Hash.base36(sys.props.getOrElse("test_group", "default")).take(4)
-  Thread.currentThread().setName(s"lakehouseCore-$hash")
+object SparkTestEnv {
 
   private lazy val config =
     Configuration
@@ -20,4 +19,12 @@ object TestConfig {
       )
 
   lazy val sparkConfig = config.getSparkConfig
+
+  val spark = SparkSession.active
+
+  def ensureInitialized() = SparkEnv.ensureInitialized(sparkConfig)
+  def idResolver = SparkEnv.idResolver
+  def idResolverWithTablePrefix(prefix: String) = SparkEnv.idResolverWithTablePrefix(prefix)
+  def clearIdResolverTablePrefix = SparkEnv.clearIdResolverTablePrefix()
+
 }

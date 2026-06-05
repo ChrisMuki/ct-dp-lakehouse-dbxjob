@@ -7,25 +7,19 @@
 .vscode**
 project/.bloop**
 project/project**
-project/target**
 project/metals.sbt
 target/*
 
 */target/*
 
 # ignore local test-config resources
-*/src/test/resources/test-config.json
-*/src/test/resources/test-config.json.*
-!*/src/test/resources/test-config.json.template
+*/src/test/resources/local-config.json
+*/src/test/resources/local-config.json.*
+!*/src/test/resources/local-config.json.template
+almond/src/main/resources/local-config.json
+almond/src/main/resources/local-config.json.*
+!almond/src/main/resources/local-config.json.template
 
-# ignore local run scripts
-run-all-tables.sh
-
-# ignore secrets
-cicd/src/main/resources/*.json
 
 # ignore databricks 
 .databricks/*
-
-
-config/config.json

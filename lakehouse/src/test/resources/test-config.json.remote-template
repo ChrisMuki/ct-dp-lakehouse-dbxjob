@@ -1,0 +1,22 @@
+{
+    "sparkConfig": {
+        "clazz": "RemoteSandbox",
+        "stage": "dev",
+        "workspaceUrl": "adb-7405619744514197.17.azuredatabricks.net",
+        "azAuth": "AzureCli",
+        "clusterId": "0331-144953-wn0gosu8",
+        "schema": "uia00402",
+        "readFromLakehouse": {
+            "sr": {
+                "*": [
+                    "*"
+                ]
+            },
+            "sr_raw": {
+                "*": [
+                    "*"
+                ]
+            }
+        }
+    }
+}

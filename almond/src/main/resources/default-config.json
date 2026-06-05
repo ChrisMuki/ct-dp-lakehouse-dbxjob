@@ -1,0 +1,7 @@
+{
+    "sparkConfig": {
+        "clazz": "LocalSpark",
+        "master": "local[*]",
+        "ephemeralRoot": "/tmp/dp-lakehouse-dbxjob-almond"
+    }
+}
