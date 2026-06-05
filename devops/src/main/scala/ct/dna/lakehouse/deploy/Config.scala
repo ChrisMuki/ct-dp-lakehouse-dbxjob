@@ -90,31 +90,29 @@ object Config {
         // Disk cache: perf-only (no correctness impact). On in every stage to avoid env drift.
         "spark.databricks.io.cache.enabled" -> "true"
       ) ++ dqp(
-        // AQE initial partition count sized to the worker (8c -> 32, 96c -> 384); SR also turns the MERGE
-        // materialize-source knob off in dev/qual (cheap small MERGEs).
         dev_qual = Map(
           "spark.databricks.delta.merge.materializeSource" -> "none",
-          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "32"
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 16 * 4).toString
         ),
-        // aggressiveWindowDownS only matters on the big prod cluster's autoscale-release behaviour.
         prod = Map(
-          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "384"
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 96 * 4).toString
         )
       ),
       taskParallelism = dqp(dev_qual = 20, prod = 40),
-      schedule = JobSchedule(quartzCronExpression = "0 0 2 * * ?", timezoneId = "UTC", pauseStatus = dqp("PAUSED", "PAUSED", "UNPAUSED"))
+      schedule = JobSchedule(quartzCronExpression = "0 0 2 * * ?", timezoneId = "UTC", pauseStatus = dqp("PAUSED", "UNPAUSED"))
     )
 
-    // DM/MD and the dw_tx mirror = few large tables: derived from SR but with a smaller prod worker + driver, a smaller
-    // prod AQE partition count (E32ds_v5 -> 128) and less in-JVM parallelism. dev/qual inherit SR's shape.
     val dmConfig = srConfig.copy(
       taskParallelism = dqp(dev_qual = 10, prod = 15),
       nodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E32ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E4ds_v5", prod = "Standard_E8ds_v5"),
-      sparkConf = srConfig.sparkConf ++ Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> "128"),
+      sparkConf = srConfig.sparkConf ++ dqp(
+        dev_qual = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 8 * 4).toString),
+        prod = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 32 * 4).toString)
+      ),
       schedule = srConfig.schedule.copy(quartzCronExpression = "0 0 4 * * ?")
     )
-    // dw_tx differs from dm_md only in its schedule.
+
     val dwConfig = dmConfig.copy(schedule = srConfig.schedule.copy(quartzCronExpression = "0 0 3 * * ?"))
 
     Config(
