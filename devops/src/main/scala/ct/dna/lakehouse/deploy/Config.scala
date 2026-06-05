@@ -82,6 +82,16 @@ object Config {
         "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "33554432",
         "spark.sql.adaptive.coalescePartitions.minPartitionSize" -> "16MB",
         "spark.sql.objectHashAggregate.sortBased.fallbackThreshold" -> "4096",
+        // Read split size. The CDF partial aggregation runs PRE-shuffle on the input partitions and does not
+        // shrink the data here (the wide `first/max` buffer carries every column, ~1 row per group), so it is pure
+        // per-task CPU. Splitting the read into more, smaller partitions parallelises exactly that step — without an
+        // extra shuffle. 32MB takes the ~1.3GB read from ~10 to ~40 tasks; drop to 16MB to double it again. No-op on
+        // the tiny dev/qual data (files already below the limit), so it stays uniform across stages.
+        "spark.sql.files.maxPartitionBytes" -> (32 * 1024 * 1024).toString,
+        // Target size of each POST-shuffle partition (AQE). Governs the partition count of the final aggregate and
+        // the MERGE write — the other half of "make the operations smaller". 32MB sits above the 16MB coalesce floor
+        // above, so AQE coalesces toward 32MB instead of the 64MB default → more, smaller post-shuffle tasks.
+        "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (32 * 1024 * 1024).toString,
         // Behavioural Delta write knobs — identical across stages so dev/qual produce the same output file
         // layout as prod (optimizeWrite coalesces the fan-out, autoCompact compacts small files afterwards).
         // Cheap no-ops on the tiny dev/qual data; essential on the large prod MERGEs.
@@ -98,12 +108,12 @@ object Config {
           "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 96 * 4).toString
         )
       ),
-      taskParallelism = dqp(dev_qual = 20, prod = 40),
+      taskParallelism = dqp(dev_qual = 8 * 2, prod = 16 * 2),
       schedule = JobSchedule(quartzCronExpression = "0 0 2 * * ?", timezoneId = "UTC", pauseStatus = dqp("PAUSED", "UNPAUSED"))
     )
 
     val dmConfig = srConfig.copy(
-      taskParallelism = dqp(dev_qual = 10, prod = 15),
+      taskParallelism = dqp(dev_qual = 4 * 2, prod = 8 * 2),
       nodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E32ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E4ds_v5", prod = "Standard_E8ds_v5"),
       sparkConf = srConfig.sparkConf ++ dqp(
