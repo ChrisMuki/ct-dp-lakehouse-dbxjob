@@ -77,6 +77,12 @@ object Config {
       driverNodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       sparkConf = Map(
         "spark.scheduler.mode" -> "FAIR",
+        // Layered FAIR pools (lakehouse-0 .. lakehouse-6, weights 10^i) only set each pool's *fair share* — which pool
+        // wins newly freed cores. Databricks task preemption is a separate mechanism that actively KILLS running tasks of
+        // an under-share pool to hand its cores to a heavier one; with the 10^i spread that fires on almost any overlap,
+        // producing a flood of "preempted by scheduler" task restarts (wasted work, no correctness gain). Disable it: the
+        // weights still prioritise later layers for free cores, but in-flight tasks are never torn down.
+        "spark.databricks.preemption.enabled" -> "false",
         "spark.databricks.aggressiveWindowDownS" -> "600",
         "spark.sql.autoBroadcastJoinThreshold" -> "33554432",
         "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "33554432",
