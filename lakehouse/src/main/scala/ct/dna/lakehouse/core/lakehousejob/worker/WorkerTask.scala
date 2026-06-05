@@ -64,11 +64,26 @@ final case class WorkerTask(idx: Int, poolSize: Int) extends Task {
     SparkEnv.setPoolStrategy(PoolStrategy.Layered("lakehouse"))
     workerSpark.set(SparkSession.active)
 
+    // Make the watchdog's tag-cancel "hard" on the executor side: with interruptOnCancel the cancelled job's executor
+    // task threads are interrupted instead of only being asked to stop cooperatively, so a task blocked in an
+    // interruptible call (e.g. an object-store read) actually unwinds. It is a thread-local Spark property read at
+    // job-submit time, so setting it here scopes it to exactly this worker's jobs — which are the only ones the watchdog
+    // ever cancels. Classic only: under Spark Connect there is no SparkContext and cancellation is handled server-side
+    // by `interruptTag`, so the call simply fails and is ignored.
+    Try(SparkSession.active.sparkContext.setInterruptOnCancel(true)) match {
+      case Success(_) => logger.debug(s"$name: interruptOnCancel enabled for this worker's Spark jobs")
+      case Failure(_) => // Spark Connect / no SparkContext — nothing to do
+    }
+
     while (shouldContinue && SharedState.queue.pendingCount > 0) {
       SharedState.queue.pollOne() match {
         case None =>
           logger.debug("Sleeping.")
-          Thread.sleep(WorkerTask.IdleSleepMs)
+          // The watchdog interrupts a worker thread only while it is processing a table, but a cross-thread race can land
+          // that interrupt here, between tables. Swallow it (the table-level handling already recorded the timeout) so a
+          // stray interrupt never tears the worker — and the whole pool — down.
+          try Thread.sleep(WorkerTask.IdleSleepMs)
+          catch { case _: InterruptedException => Thread.interrupted() }
         case Some(item) =>
           // Table-level errors are fully handled inside processOne and never propagate here.
           processOne(item)
@@ -106,7 +121,7 @@ final case class WorkerTask(idx: Int, poolSize: Int) extends Task {
 
     val t0 = System.currentTimeMillis()
     logger.debug(s"START   $tableId")
-    running = Some(RunningTable(tableId, t0))
+    running = Some(RunningTable(tableId, t0, Thread.currentThread()))
 
     // Tag every Spark job this table submits with a unique job tag. The watchdog (a different thread) cancels exactly
     // this table by that tag. Routed through `SparkJobTags` (the upcoming `SparkEnv.tag`/`cancel`): classic uses the
@@ -123,9 +138,11 @@ final case class WorkerTask(idx: Int, poolSize: Int) extends Task {
             SharedState.recordOutcome(tableId, TableOutcome.Updated)
             (TableRunRow.Status_Updated, None)
           case Failure(ex) =>
-            // The watchdog adds the tableId to `cancelledForTimeout` *before* it cancels this table's job tag,
-            // so on the surfaced "job cancelled" exception we can still attribute the cause.
-            val wasTimedOut = EntryPoint.cancelledForTimeout.remove(tableId)
+            // The watchdog records this tableId in `cancelDeadlines` *before* it cancels the job tag, so on the
+            // surfaced "job cancelled"/interrupt exception we can still attribute the cause. `claimTimeout` clears
+            // the per-table cancel/escalation state; the worker's interrupt flag is cleared unconditionally in the
+            // `finally` below so a hard escalation can never leak into the next table.
+            val wasTimedOut = EntryPoint.claimTimeout(tableId)
             if (wasTimedOut) {
               val elapsedMs = System.currentTimeMillis() - t0
               val limitMs = SharedState.orchestratorConfig.maxTableRuntimeMs.getOrElse(0L)
@@ -147,6 +164,9 @@ final case class WorkerTask(idx: Int, poolSize: Int) extends Task {
         running = None
         Try(SparkEnv.untag(jobTag))
         Try(SparkEnv.clearDescription())
+        // Clear any interrupt flag set by a watchdog escalation so the next loop iteration's blocking calls don't
+        // spuriously throw. The worker is only ever interrupted by the watchdog, so clearing here is always correct.
+        Thread.interrupted()
       }
     val t1 = System.currentTimeMillis()
     val durSec = math.max(0L, (t1 - t0) / 1000L)
@@ -224,7 +244,7 @@ final class TableTimeoutException(val tableId: TableID, val elapsedMs: Long, val
 /** A table a worker is currently processing, together with the wall-clock time (ms) the worker started it. Replaces the bare `(TableID, Long)` tuple so the
   * timestamp's meaning is explicit and the elapsed-time arithmetic lives in one place.
   */
-final case class RunningTable(tableId: TableID, startedAtMs: Long) {
+final case class RunningTable(tableId: TableID, startedAtMs: Long, thread: Thread) {
 
   /** Milliseconds this table has been running as of `nowMs` (never negative). */
   def elapsedMs(nowMs: Long): Long = math.max(0L, nowMs - startedAtMs)

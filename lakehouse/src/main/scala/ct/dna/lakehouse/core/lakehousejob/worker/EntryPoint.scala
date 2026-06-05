@@ -47,8 +47,18 @@ object EntryPoint extends TaskEntryPoint {
   /** Table-ids whose dependency closure includes a failed ancestor — workers skip these instead of running them. */
   private[worker] val skippedTables: java.util.Set[TableID] = ConcurrentHashMap.newKeySet[TableID]()
 
-  /** Table-ids the watchdog just asked Spark to cancel; the processing worker reads this to classify the surfaced exception as a timeout, then removes it. */
-  private[worker] val cancelledForTimeout: java.util.Set[TableID] = ConcurrentHashMap.newKeySet[TableID]()
+  /** Tables the watchdog has asked Spark to cancel, mapped to the wall-clock ms of that *first* cancel. The processing worker reads this to classify the
+    * surfaced exception as a timeout (then clears it via [[claimTimeout]]); the watchdog reads it to decide when a still-running table must be force-escalated.
+    */
+  private[worker] val cancelDeadlines: ConcurrentHashMap[TableID, java.lang.Long] = new ConcurrentHashMap[TableID, java.lang.Long]()
+
+  /** Tables already hard-escalated (worker thread interrupted) so the watchdog interrupts each one at most once. */
+  private[worker] val escalatedTables: java.util.Set[TableID] = ConcurrentHashMap.newKeySet[TableID]()
+
+  /** Grace window after the first cooperative cancel before the watchdog escalates to interrupting the worker thread. The soft cancel ([[SparkEnv.cancel]])
+    * only stops Spark *jobs*; a table stuck in non-Spark driver code or an unresponsive Connect await needs the interrupt to break out.
+    */
+  private final val EscalateGraceMs: Long = 60_000L
 
   override def createInstance(args: Array[String]): Task = {
     PrintlnAppender.replaceConsoleAppendersWithPrintlnAppenders()
@@ -93,6 +103,10 @@ object EntryPoint extends TaskEntryPoint {
 
   /** Per-table watchdog: cancels any table running longer than `limitMs` by cancelling that table's context-global Spark job tag, and records it as a timeout
     * so the worker writes a `TIMED_OUT` row and cascade-skips descendants. Driven by the Orchestrator once per status tick.
+    *
+    * Escalation: the first tick over the limit issues a cooperative [[SparkEnv.cancel]]. While the table keeps running on later ticks the cancel is re-issued
+    * (a fresh stage may have started a new job after the first cancel); if it is still running after [[EscalateGraceMs]] the watchdog escalates once by
+    * interrupting the worker thread, which breaks it out of non-Spark driver code or an unresponsive await.
     */
   def enforceTimeouts(limitMs: Long): Unit = {
     val nowMs = System.currentTimeMillis()
@@ -100,15 +114,39 @@ object EntryPoint extends TaskEntryPoint {
       w.currentTable.foreach { rt =>
         val tableId = rt.tableId
         val elapsedMs = rt.elapsedMs(nowMs)
-        if (elapsedMs > limitMs && cancelledForTimeout.add(tableId)) {
+        if (elapsedMs > limitMs) {
           val jobTag = WorkerTask.buildJobTag(tableId)
-          logger.warn(s"WATCHDOG cancelling $tableId on ${w.name}: elapsed=${elapsedMs / 1000}s > limit=${limitMs / 1000}s (tag=$jobTag)")
-          Try(SparkEnv.cancel(jobTag)).failed.foreach { t =>
-            logger.warn(s"WATCHDOG cancel($jobTag) failed: ${t.getClass.getSimpleName}: ${t.getMessage}")
+          val firstCancelMs = cancelDeadlines.putIfAbsent(tableId, nowMs)
+          if (firstCancelMs == null) {
+            logger.warn(s"WATCHDOG cancelling $tableId on ${w.name}: elapsed=${elapsedMs / 1000}s > limit=${limitMs / 1000}s (tag=$jobTag)")
+            tryCancel(jobTag)
+          } else {
+            // Already cancelled on an earlier tick but still running: re-issue the cancel to catch a job started after it ...
+            tryCancel(jobTag)
+            val sinceCancelMs = nowMs - firstCancelMs
+            if (sinceCancelMs > EscalateGraceMs && escalatedTables.add(tableId)) {
+              // ... and if the soft cancel still hasn't taken hold, escalate hard by interrupting the worker thread (once).
+              logger.warn(s"WATCHDOG escalating $tableId on ${w.name}: still running ${sinceCancelMs / 1000}s after cancel — interrupting worker thread")
+              rt.thread.interrupt()
+            }
           }
         }
       }
     }
+  }
+
+  /** Best-effort cooperative cancel of every Spark job carrying `jobTag`; failures are logged, not propagated. */
+  private def tryCancel(jobTag: String): Unit =
+    Try(SparkEnv.cancel(jobTag)).failed.foreach { t =>
+      logger.warn(s"WATCHDOG cancel($jobTag) failed: ${t.getClass.getSimpleName}: ${t.getMessage}")
+    }
+
+  /** Called by a worker when its table surfaced an exception: returns `true` if the watchdog had cancelled this table (so it is a timeout, not a real failure),
+    * clearing the per-table cancel and escalation state in the process.
+    */
+  private[worker] def claimTimeout(tableId: TableID): Boolean = {
+    escalatedTables.remove(tableId)
+    cancelDeadlines.remove(tableId) != null
   }
 
   /** Flush result rows, log the final STATUS + slowest-tables blocks, terminate any still-running workers. Runs at most once — triggered either by the
