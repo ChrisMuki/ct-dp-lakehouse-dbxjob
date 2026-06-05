@@ -130,8 +130,9 @@ case class AssetDirectory(
           // Photon enabled: although the lakehouse jobs do heavy shuffle/IO (Delta merges, large SAP rebuilds),
           // the per-task plans are also CPU-bound on vectorisable operators — SortMergeJoin, Sort, SortAggregate
           // and the post-join Generate/explode chain on the MERGE write side — which Photon accelerates. Worth
-          // the ~2x DBU rate when wall-clock drops more than that. Switch back to "STANDARD" if benchmarks regress.
-          runtimeEngine = "PHOTON",
+          // the ~2x DBU rate when wall-clock drops more than that. Switch a catalog to "STANDARD" via its
+          // CatalogConfig.runtimeEngine if benchmarks regress.
+          runtimeEngine = cfg.runtimeEngine,
           kind = "CLASSIC_PREVIEW",
           isSingleNode = false,
           autoscale = Autoscale(minWorkers = cfg.minWorkerNodes, maxWorkers = cfg.maxWorkerNodes)

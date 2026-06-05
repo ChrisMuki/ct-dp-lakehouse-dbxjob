@@ -5,6 +5,7 @@ import scala.jdk.CollectionConverters._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.util.control.NonFatal
 
 import ct.dna.lakehouse.core.framework.internal.TableManager
 import ct.dna.lakehouse.core.framework.internal.UpdatedTableProcessor
@@ -133,11 +134,12 @@ final case class WorkerTask(idx: Int, poolSize: Int) extends Task {
 
     val (status, errOpt): (String, Option[Throwable]) =
       try {
-        Try(update(tableSpec)) match {
-          case Success(_) =>
-            SharedState.recordOutcome(tableId, TableOutcome.Updated)
-            (TableRunRow.Status_Updated, None)
-          case Failure(ex) =>
+        try {
+          update(tableSpec)
+          SharedState.recordOutcome(tableId, TableOutcome.Updated)
+          (TableRunRow.Status_Updated, None)
+        } catch {
+          case ex if NonFatal(ex) || ex.isInstanceOf[InterruptedException] =>
             // The watchdog records this tableId in `cancelDeadlines` *before* it cancels the job tag, so on the
             // surfaced "job cancelled"/interrupt exception we can still attribute the cause. `claimTimeout` clears
             // the per-table cancel/escalation state; the worker's interrupt flag is cleared unconditionally in the

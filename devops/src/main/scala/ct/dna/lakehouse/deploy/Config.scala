@@ -80,7 +80,7 @@ object Config {
       // scale across the smaller nodes' aggregate capacity just as well.
       minWorkerNodes = dqp(dev_qual = 1, prod = 2),
       maxWorkerNodes = dqp(dev_qual = 2, prod = 3),
-      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E32ds_v5"),
+      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E48ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       sparkConf = Map(
         "spark.scheduler.mode" -> "FAIR",
@@ -121,7 +121,8 @@ object Config {
           "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 96 * 4).toString
         )
       ),
-      taskParallelism = dqp(dev_qual = 8 * 2, prod = 16 * 2),
+      taskParallelism = dqp(dev_qual = 8 * 2, prod = 48),
+      runtimeEngine = "PHOTON",
       schedule = JobSchedule(quartzCronExpression = "0 0 2 * * ?", timezoneId = "UTC", pauseStatus = dqp("PAUSED", "UNPAUSED"))
     )
 
