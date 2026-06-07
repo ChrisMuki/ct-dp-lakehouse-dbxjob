@@ -72,15 +72,16 @@ object Config {
     val srConfig = CatalogConfig(
       sparkVersion = "17.3.x-scala2.13",
       clusterPolicyId = dqp("000AC9F2923A51E1", "001F2C351BFE187D", "0009D8E7AF32CDAF"),
-      // prod: 2-3 smaller E32 workers instead of one fat E96. The single-E96 ran ~32 tables in one 96-core JVM whose
-      // ~111GB heap hit GC pauses long enough (155s) to time out the executor heartbeat; its death wiped every in-memory
-      // localCheckpoint and failed all dependent tasks (CHECKPOINT_RDD_BLOCK_ID_NOT_FOUND). Splitting the same ~64-96
-      // aggregate cores across 2-3 JVMs keeps heaps small (shorter GC) and spreads checkpoints so one executor loss is
-      // survivable. min=2 guarantees that redundancy from the start; large MERGEs are distributed sort-merge joins and
-      // scale across the smaller nodes' aggregate capacity just as well.
-      minWorkerNodes = dqp(dev_qual = 1, prod = 2),
-      maxWorkerNodes = dqp(dev_qual = 2, prod = 3),
-      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E96ds_v5"),
+      // prod: 4 smaller E48 workers instead of 2 fat E96 — same 192 aggregate cores, but each JVM heap roughly halves
+      // (E48 ≈ 384GB node vs E96 ≈ 672GB), so the Full-GC pauses that were timing out the 120s executor heartbeat
+      // (observed 125-176s on the E96; ~29% of total cluster runtime lost to GC, 800+ major GCs per executor) shrink
+      // back under the heartbeat window. More JVMs also spread the in-memory localCheckpoints, so losing one executor is
+      // survivable instead of wiping a whole 96-core node (CHECKPOINT_RDD_BLOCK_ID_NOT_FOUND). Large MERGEs are
+      // distributed sort-merge joins and scale across the 4 smaller nodes' aggregate capacity just as well. dev/qual
+      // stay at 2× E16 (tiny data). dm_md/dw_tx override the worker count back to 2 below (they don't run sr's MERGEs).
+      minWorkerNodes = dqp(dev_qual = 2, prod = 4),
+      maxWorkerNodes = dqp(dev_qual = 2, prod = 4),
+      nodeTypeId = dqp(dev_qual = "Standard_E16ds_v5", prod = "Standard_E48ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       sparkConf = Map(
         "spark.scheduler.mode" -> "FAIR",
@@ -93,7 +94,9 @@ object Config {
         "spark.databricks.aggressiveWindowDownS" -> "600",
         "spark.sql.autoBroadcastJoinThreshold" -> "33554432",
         "spark.sql.adaptive.autoBroadcastJoinThreshold" -> "33554432",
-        "spark.sql.adaptive.coalescePartitions.minPartitionSize" -> "16MB",
+        // Coalesce floor: AQE never shrinks a post-shuffle partition below this. Kept at half the advisory size below
+        // (8MB vs 16MB) so coalescing still has head-room after the advisory was lowered from 32MB.
+        "spark.sql.adaptive.coalescePartitions.minPartitionSize" -> "8MB",
         "spark.sql.objectHashAggregate.sortBased.fallbackThreshold" -> "4096",
         // Read split size. The CDF partial aggregation runs PRE-shuffle on the input partitions and does not
         // shrink the data here (the wide `first/max` buffer carries every column, ~1 row per group), so it is pure
@@ -102,9 +105,10 @@ object Config {
         // the tiny dev/qual data (files already below the limit), so it stays uniform across stages.
         "spark.sql.files.maxPartitionBytes" -> (32 * 1024 * 1024).toString,
         // Target size of each POST-shuffle partition (AQE). Governs the partition count of the final aggregate and
-        // the MERGE write — the other half of "make the operations smaller". 32MB sits above the 16MB coalesce floor
-        // above, so AQE coalesces toward 32MB instead of the 64MB default → more, smaller post-shuffle tasks.
-        "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (32 * 1024 * 1024).toString,
+        // the MERGE write — the other half of "make the operations smaller". Lowered 32MB → 16MB to halve per-task
+        // shuffle/merge memory (the prod sr MERGE spilled ~276GB in one stage and ran 44% in GC); 16MB still sits above
+        // the 8MB coalesce floor above, so AQE coalesces toward 16MB → ~2× more, smaller post-shuffle tasks. Benchmark lever.
+        "spark.sql.adaptive.advisoryPartitionSizeInBytes" -> (16 * 1024 * 1024).toString,
         // Behavioural Delta write knobs — identical across stages so dev/qual produce the same output file
         // layout as prod (optimizeWrite coalesces the fan-out, autoCompact compacts small files afterwards).
         // Cheap no-ops on the tiny dev/qual data; essential on the large prod MERGEs.
@@ -112,35 +116,56 @@ object Config {
         "spark.databricks.delta.autoCompact.enabled" -> "true",
         // Disk cache: perf-only (no correctness impact). On in every stage to avoid env drift.
         "spark.databricks.io.cache.enabled" -> "true",
-        // Never materialize (localCheckpoint) the MERGE source. Delta's default ("auto") spools the source into an
-        // in-memory, unreplicated RDD checkpoint as a correctness guard against a *non-deterministic* source being
-        // re-scanned by the inner/outer MERGE joins. Our CDF source read is deterministic (`lastOfKey()` over an
-        // immutable input snapshot), so that guard buys nothing and costs a lot: the checkpoint both inflated the
-        // SparkPlanInfo past the 2MB listener limit (JsonMappingException spam) and, living only in executor memory,
-        // vanished when an executor died — surfacing as CHECKPOINT_RDD_BLOCK_ID_NOT_FOUND, forcing a full MERGE recompute
-        // that then blew the watchdog. "none" drops the checkpoint entirely: smaller plans, and one executor loss no
-        // longer poisons every in-flight MERGE. Uniform across stages now that prod no longer needs the "auto" guard.
-        "spark.databricks.delta.merge.materializeSource" -> "none"
+        // Heartbeat head-room. Executors were declared dead after 125-176s Full-GC pauses (the default
+        // spark.network.timeout=120s drives the driver's heartbeat-receiver timeout). Raise to 300s so a long GC pause
+        // no longer kills an otherwise-healthy executor. Band-aid that complements the smaller E48 nodes above.
+        "spark.network.timeout" -> "300s",
+        // MERGE source materialization resilience. Databricks ALWAYS materializes the MERGE source (the value "none" of
+        // spark.databricks.delta.merge.materializeSource only exists in OSS Delta; DBR accepts only "auto"/"all"), storing
+        // it as a localCheckpoint RDD. The default storage level DISK_ONLY keeps ONE copy on one executor, so when that
+        // executor dies the block is unrecoverable → CHECKPOINT_RDD_BLOCK_ID_NOT_FOUND → full recompute cascade (the main
+        // reason one executor loss dragged whole tables to hours). DISK_ONLY_2 keeps a second replica on another node, so
+        // a single executor loss is survived without recompute. Costs ~1× extra disk + replication traffic on the
+        // materialized source; cheap vs. an hours-long recompute. Benchmark lever.
+        "spark.databricks.delta.merge.materializeSource.rddStorageLevel" -> "DISK_ONLY_2"
       ) ++ dqp(
+        // initialPartitionNum = numWorkers × coresPerWorker × 4 (= total cores × 4); the prod value is unchanged at 768
+        // because 4×E48 = 2×E96 = 192 cores. Also pin spark.sql.shuffle.partitions to the same value so exchanges that
+        // bypass AQE coalescing stop falling back to the magic default of 200 (the many "exactly 200-task" stages seen in
+        // the Spark UI) — AQE coalesces the small ones back up toward the 16MB advisory size anyway. Benchmark lever.
         dev_qual = Map(
-          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 16 * 4).toString
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (2 * 16 * 4).toString,
+          "spark.sql.shuffle.partitions" -> (2 * 16 * 4).toString
         ),
         prod = Map(
-          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (2 * 96 * 4).toString
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (4 * 48 * 4).toString,
+          "spark.sql.shuffle.partitions" -> (4 * 48 * 4).toString
         )
       ),
-      taskParallelism = dqp(dev_qual = 8 * 2, prod = 48),
+      // In-JVM concurrent tables. Halved prod 48 → 24 so fewer heavy MERGEs share a node's heap at once (the GC-pressure
+      // driver): with 4 nodes now, 24 keeps ~6 heavy tables per node instead of ~24/node before. Benchmark lever.
+      taskParallelism = dqp(dev_qual = 8 * 2, prod = 24),
       runtimeEngine = "PHOTON",
       schedule = JobSchedule(quartzCronExpression = "0 0 2 * * ?", timezoneId = "UTC", pauseStatus = dqp("PAUSED", "UNPAUSED"))
     )
 
     val dmConfig = srConfig.copy(
+      // dm_md/dw_tx keep the original 2× E16 shape (they don't run the heavy sr MERGEs); pin the worker count back to 2
+      // because srConfig now defaults prod to 4 workers.
+      minWorkerNodes = 2,
+      maxWorkerNodes = 2,
       taskParallelism = dqp(dev_qual = 4 * 2, prod = 8 * 2),
       nodeTypeId = dqp(dev_qual = "Standard_E8ds_v5", prod = "Standard_E16ds_v5"),
       driverNodeTypeId = dqp(dev_qual = "Standard_E4ds_v5", prod = "Standard_E8ds_v5"),
       sparkConf = srConfig.sparkConf ++ dqp(
-        dev_qual = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 8 * 4).toString),
-        prod = Map("spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 32 * 4).toString)
+        dev_qual = Map(
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 8 * 4).toString,
+          "spark.sql.shuffle.partitions" -> (1 * 8 * 4).toString
+        ),
+        prod = Map(
+          "spark.sql.adaptive.coalescePartitions.initialPartitionNum" -> (1 * 32 * 4).toString,
+          "spark.sql.shuffle.partitions" -> (1 * 32 * 4).toString
+        )
       ),
       schedule = srConfig.schedule.copy(quartzCronExpression = "0 0 4 * * ?")
     )

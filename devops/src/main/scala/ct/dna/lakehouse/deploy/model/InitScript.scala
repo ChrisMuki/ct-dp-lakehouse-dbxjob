@@ -44,7 +44,7 @@ chmod 644 "${DEST}"
 
 echo "[INFO] Driver log4j2.xml replaced from ${SRC}"
 
-# FAIR scheduler allocation file for the lakehouse job's layered pools (lakehouse-0 .. lakehouse-6).
+# FAIR scheduler allocation file for the lakehouse job's layered pools (lakehouse-0 .. lakehouse-9).
 # Written to a driver-LOCAL path before the SparkContext starts so `spark.scheduler.allocation.file=file:__ALLOC__`
 # can load it without routing through DBFS or Unity Catalog (neither is usable for this file at SparkContext init).
 ALLOC="__ALLOC__"
@@ -75,7 +75,7 @@ object InitScript {
   /** Highest layer index that maps to a distinct pool (`lakehouse-0` .. `lakehouse-MaxLayer`). Must match `PoolStrategy.Layered.MaxLayer` in the lakehouse
     * runtime, which clamps deeper layers to this pool.
     */
-  val MaxLayer: Int = 6
+  val MaxLayer: Int = 9
 
   /** FAIR allocation XML defining `lakehouse-0` .. `lakehouse-MaxLayer`, each in FAIR mode with `minShare = 0` and an exponentially scaling weight (10^i), so
     * later (heavier) processing stages win cores over earlier stages when pools contend.
