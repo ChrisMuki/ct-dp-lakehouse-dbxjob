@@ -59,49 +59,62 @@ This improves precision and avoids rounding issues.
 
 ---
 
-## Core Formula
+## Final Rate Calculation
 
-The correct conversion formula is:
+The `final_rate` stored in `fx_conversion_rates` is computed from TCURR + TCURF as follows:
+
+### Positive UKURS (direct quotation)
 
 ```
-amount_in_target = amount_in_source × (TFACT / FFACT) × UKURS
+final_rate = (TFACT × UKURS) / FFACT
 ```
 
-### Example
+### Negative UKURS (inverse quotation)
+
+A negative `UKURS` represents an **inverse quotation** — not a negative value.
+
+```
+final_rate = TFACT / (FFACT × ABS(UKURS))
+```
+
+### Zero-value Guard
+
+If `FFACT = 0` or `TFACT = 0`, the rate is set to `null` and excluded from output.
+
+### Example 1: JPY → EUR (positive UKURS, large FFACT)
 
 Given:
 
-- **TCURR**: `UKURS = 0.90` (USD → JPY)
-- **TCURF**: `FFACT = 1`, `TFACT = 100`
+- **TCURR**: `FCURR = JPY`, `TCURR = EUR`, `UKURS = 0.6115`
+- **TCURF**: `FFACT = 100`, `TFACT = 1`
 
-Interpretation: 0.90 USD corresponds to 100 JPY → 1 JPY = 0.90 / 100 = 0.009 USD
-
-### Step-by-step Calculation
-
-To convert 500 JPY → USD:
-
-1. Normalize rate to per-unit:
-
-   ```
-   per_unit_rate = UKURS × (TFACT / FFACT)
-                 = 0.90 × (1 / 100)
-                 = 0.009
-   ```
-
-2. Apply conversion:
-
-   ```
-   500 × 0.009 = 4.5 USD
-   ```
-
-### Negative UKURS
-
-If `UKURS` is negative, it represents an **inverse quotation** (not a negative value).
+Calculation (positive UKURS):
 
 ```
-effective_rate = 1 / ABS(UKURS)
-final_rate     = (TFACT / FFACT) × effective_rate
+final_rate = (TFACT × UKURS) / FFACT
+           = (1 × 0.6115) / 100
+           = 0.006115
 ```
+
+Interpretation: SAP stores the rate for 100 JPY (FFACT=100) rather than 1 JPY.
+The formula normalizes this to a per-unit rate: 1 JPY = 0.006115 EUR.
+
+### Example 2: USD → EUR (negative UKURS)
+
+Given:
+
+- **TCURR**: `FCURR = USD`, `TCURR = EUR`, `UKURS = -1.10`
+- **TCURF**: `FFACT = 1`, `TFACT = 1`
+
+Calculation (negative UKURS):
+
+```
+final_rate = TFACT / (FFACT × ABS(UKURS))
+           = 1 / (1 × 1.10)
+           = 0.909091
+```
+
+Interpretation: 1 USD = 0.909091 EUR
 
 ---
 
@@ -126,8 +139,8 @@ final_rate     = (TFACT / FFACT) × effective_rate
 1. **Prepare TCURR** — Normalize column names from SR schema variants (`mandt_string` → `mandt`, etc.)
 2. **Prepare Archive** — Convert the archive table into the same TCURR shape (hardcoded `mandt = "100"`)
 3. **Union** — Combine GHP TCURR + Archive TCURR
-4. **Join TCURF** — LEFT JOIN with TCURF on `(mandt, kurst, fcurr, tcurr)` where `tcurf.gdatu >= tcurr.gdatu`; pick the closest factor row via `row_number()`
-5. **Compute EUR rates** — Apply the formula: `(TFACT / FFACT) × UKURS` (with negative UKURS handling)
+4. **Join TCURF** — LEFT JOIN with TCURF on `(mandt, kurst, fcurr, tcurr)` where `tcurf.gdatu >= tcurr.gdatu`; pick the earliest TCURF row whose GDATU is greater than or equal to the TCURR GDATU using `row_number()`
+5. **Compute EUR rates** — Apply `(TFACT × UKURS) / FFACT` for positive UKURS, or `TFACT / (FFACT × ABS(UKURS))` for negative UKURS; null if FFACT or TFACT is zero
 6. **Derive additional rate sets**:
    - **EUR inverse**: `1 / final_rate` (EUR → X)
    - **Cross rates**: `rate(A→EUR) / rate(B→EUR)` = `rate(A→B)`
@@ -229,15 +242,16 @@ These are generated so that downstream consumers can always find a rate for any 
         ┌──────────────────────────────────────────────┐
         │           LEFT JOIN TCURR × TCURF            │
         │  on (mandt, kurst, fcurr, tcurr, gdatu)      │
-        │  pick closest factor via row_number()        │
+        │  pick earliest TCURF where GDATU >= TCURR    │
+        │  GDATU using row_number()                    │
         └──────────────────────┬───────────────────────┘
                                │
                                ▼
-                  ┌────────────────────────┐
-                  │   Compute EUR Rates    │
-                  │  (TFACT/FFACT) × UKURS │
-                  │  handle negative UKURS │
-                  └────────────┬───────────┘
+                  ┌─────────────────────────────────┐
+                  │       Compute EUR Rates          │
+                  │  +UKURS: (TFACT×UKURS)/FFACT     │
+                  │  −UKURS: TFACT/(FFACT×ABS(UKURS))│
+                  └────────────────┬────────────────┘
                                │
               ┌────────┬───────┼────────┬──────────┐
               ▼        ▼       ▼        ▼          ▼
@@ -263,6 +277,45 @@ These are generated so that downstream consumers can always find a rate for any 
                   │  (full-recompute)      │
                   └────────────────────────┘
 ```
+
+---
+
+## Precision Handling
+
+The business logic did **not** change.
+
+Previously, Spark evaluated the calculation through multiple intermediate decimal operations.
+During those intermediate steps, precision was lost before the final rate was produced.
+For currencies with very small EUR rates (e.g., IDR → EUR ≈ `0.00004921196874`), the
+intermediate precision loss compounded when that value was used to derive inverse rates
+(EUR → IDR), producing a noticeable difference in the final result.
+
+The calculation was restructured so that intermediate arithmetic preserves `decimal(38,20)`
+precision throughout the calculation before the final rate is stored.
+
+The updated results were validated against the SAP archive/source data and align with the
+expected rates.
+
+### Example: IDR precision issue
+
+```
+IDR → EUR = 0.00004921196874
+```
+
+Derived inverse:
+
+```
+EUR → IDR = 1 / 0.00004921196874
+          ≈ 20320.26
+```
+
+In the FX rates pipeline, inverse rates are generated by taking the reciprocal of the EUR
+rate. Because of this, even a very small precision loss in the IDR → EUR rate can become a
+much larger difference when the EUR → IDR rate is derived.
+
+This was the scenario that exposed the precision issue during validation. Preserving precision
+throughout the intermediate calculation ensures the derived inverse rates align with the SAP
+archive/source data.
 
 ---
 

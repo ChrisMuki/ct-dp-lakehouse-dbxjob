@@ -31,7 +31,7 @@ object fxrates extends TableSpec[fx_conversion_rates] with Updated.ByOneTransact
     Seq(src_tcurr, src_tcurf)
 
   private val validKurst = Seq("MGR", "ZAYD", "ZMEN", "P")
-  private val rateDecimalType = "decimal(38,10)"
+  private val rateDecimalType = "decimal(38,20)"
   private val targetCurrency = "EUR"
   private val ghpMinimumRateDate = 20001231
   private val oneRate = lit(1).cast(rateDecimalType)
@@ -147,13 +147,21 @@ object fxrates extends TableSpec[fx_conversion_rates] with Updated.ByOneTransact
         col("fcurr"),
         col("tcurr"),
         col("kurst"),
-        (
-          try_divide(col("tfact"), col("ffact")) *
-            when(
-              col("ukurs") < 0,
-              try_divide(oneRate, abs(col("ukurs")))
-            ).otherwise(col("ukurs"))
-        ).cast(rateDecimalType).as("final_rate")
+        when(
+          col("ffact") === 0 || col("tfact") === 0,
+          lit(null).cast(rateDecimalType)
+        ).when(
+          col("ukurs") < 0,
+          try_divide(
+            col("tfact"),
+            col("ffact") * abs(col("ukurs"))
+          ).cast(rateDecimalType)
+        ).otherwise(
+          try_divide(
+            col("tfact") * col("ukurs"),
+            col("ffact")
+          ).cast(rateDecimalType)
+        ).as("final_rate")
       )
       .where(col("final_rate").isNotNull)
 
