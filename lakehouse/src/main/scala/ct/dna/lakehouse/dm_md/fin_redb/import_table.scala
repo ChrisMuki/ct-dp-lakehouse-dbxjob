@@ -114,6 +114,7 @@ case class DmImportTable(
     mara_matkl: String,
     mara_wrkst: String,
     matkl_text: String,
+    t134t_mtbez: String,
     t001w_werks: String,
     t001w_name1: String,
     t001w_bwkey: String,
@@ -364,6 +365,7 @@ object import_table extends TableSpec[DmImportTable] with Updated.ByOneTransacti
       col("reporting.mara_matkl"),
       col("reporting.mara_wrkst"),
       col("reporting.matkl_text"),
+      col("reporting.t134t_mtbez"),
       col("reporting.t001w_werks"),
       col("reporting.t001w_name1"),
       col("reporting.t001w_bwkey"),
@@ -501,6 +503,7 @@ sealed class C_import_table(prefix: String) extends ColumnWithNameAccessor {
   val mara_matkl: ColumnWithName = ColumnWithName(prefix, "mara_matkl")
   val mara_wrkst: ColumnWithName = ColumnWithName(prefix, "mara_wrkst")
   val matkl_text: ColumnWithName = ColumnWithName(prefix, "matkl_text")
+  val t134t_mtbez: ColumnWithName = ColumnWithName(prefix, "t134t_mtbez")
   val t001w_werks: ColumnWithName = ColumnWithName(prefix, "t001w_werks")
   val t001w_name1: ColumnWithName = ColumnWithName(prefix, "t001w_name1")
   val t001w_bwkey: ColumnWithName = ColumnWithName(prefix, "t001w_bwkey")

@@ -80,10 +80,12 @@ object lfa1 extends TableSpec[DmLfa1] with Updated.ByOneTransaction {
 
     // SAP source columns consumed before the region join. Scoped locally because lfa1 columns differ from
     // the final DmLfa1 schema (the join appends the country/geo enrichment columns).
-    val consumedValueColumnNames = Seq("_mk_system", "_mk_instance", "lifnr", "land1", "name1", "regio", "stras", "pstlz", "ort01")
+    // snapshot() always returns the sr-entity key cols (e.g. lifnr) automatically;
+    // _mk_system and _mk_instance are value cols in the source sr-entity and must be listed explicitly.
+    val consumedValueColumnNames = Seq("_mk_system", "_mk_instance", "land1", "name1", "regio", "stras", "pstlz", "ort01")
 
     val lfa1Union = sapTableSpecs
-      .map(ts => changeFeeds(ts).snapshot().select(consumedValueColumnNames.map(col): _*))
+      .map(ts => changeFeeds(ts).snapshot(consumedValueColumnNames))
       .reduce(_.unionByName(_))
       .filter(col("lifnr").isNotNull)
       .distinct()
@@ -136,7 +138,7 @@ object lfa1 extends TableSpec[DmLfa1] with Updated.ByOneTransaction {
   override def validate(): Unit = {
     super.validate()
 
-    val canonicalValuesRequired = Set("land1", "name1", "regio", "stras", "pstlz", "ort01")
+    val canonicalValuesRequired = Set("_mk_system", "_mk_instance", "land1", "name1", "regio", "stras", "pstlz", "ort01")
     val canonicalKeys = ct_gbl_e32.lfa1.keyColumnNames.toSet
 
     sapTableSpecs.foreach { spec =>

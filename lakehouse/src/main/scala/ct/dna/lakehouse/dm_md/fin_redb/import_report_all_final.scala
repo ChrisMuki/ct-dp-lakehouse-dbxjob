@@ -96,6 +96,7 @@ case class DmImportReportAllFinal(
     stawn: String,
     hscode: String,
     matkl_text: String,
+    t134t_mtbez: String,
     lfa1_eco_regions: String,
     hs_code_8: String,
     mara_matkl: String,
@@ -206,6 +207,7 @@ object import_report_all_final extends TableSpec[DmImportReportAllFinal] with Up
       when(col("src.marc_stawn").isNull || trim(col("src.marc_stawn")) === "", lit("No Entry")).otherwise(col("src.marc_stawn")).as("stawn"),
       when(col("src.hscode").isNull || trim(col("src.hscode")) === "", lit("No Entry")).otherwise(col("src.hscode")).as("hscode"),
       when(col("src.matkl_text").isNull || trim(col("src.matkl_text")) === "", lit("No Entry")).otherwise(col("src.matkl_text")).as("matkl_text"),
+      when(col("src.t134t_mtbez").isNull || trim(col("src.t134t_mtbez")) === "", lit("No Entry")).otherwise(col("src.t134t_mtbez")).as("t134t_mtbez"),
       when(col("src.lfa1_eco_regions").isNull || trim(col("src.lfa1_eco_regions")) === "", lit("No Entry"))
         .otherwise(col("src.lfa1_eco_regions"))
         .as("lfa1_eco_regions"),
@@ -321,6 +323,7 @@ sealed class C_import_report_all_final(prefix: String) extends ColumnWithNameAcc
   val stawn: ColumnWithName = ColumnWithName(prefix, "stawn")
   val hscode: ColumnWithName = ColumnWithName(prefix, "hscode")
   val matkl_text: ColumnWithName = ColumnWithName(prefix, "matkl_text")
+  val t134t_mtbez: ColumnWithName = ColumnWithName(prefix, "t134t_mtbez")
   val lfa1_eco_regions: ColumnWithName = ColumnWithName(prefix, "lfa1_eco_regions")
   val hs_code_8: ColumnWithName = ColumnWithName(prefix, "hs_code_8")
   val mara_matkl: ColumnWithName = ColumnWithName(prefix, "mara_matkl")

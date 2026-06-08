@@ -9,11 +9,12 @@ import ct.dna.lakehouse.core.model.Entity.PK
 import ct.dna.lakehouse.core.model.TableSpec
 import ct.dna.lakehouse.core.model.Updated
 import ct.dna.lakehouse.dm_md.fin_hawk.{mdp => hawk_mdp}
-import ct.dna.lakehouse.sr_raw.mn_gbl_spcustoms.{hs_codes => sr_raw_hscode}
+import ct.dna.lakehouse.dm_md.fin_redb.{t134t => dm_t134t}
+import ct.dna.lakehouse.sr_raw.mn_gbl_spcustoms.{hs_codes_regional => sr_raw_hscode}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
-case class DmCustomsRegionalReporting(
+case class DmCustomsRegionalReporting(  
     @PK _mk_system: String,
     @PK _mk_instance: String,
     // EKKO - Purchasing Header
@@ -102,6 +103,8 @@ case class DmCustomsRegionalReporting(
     mara_wrkst: String,
     // T023T
     matkl_text: String,
+    // T134T - Material Type Description
+    t134t_mtbez: String,
     // T001W - Plant Info
     t001w_werks: String,
     t001w_name1: String,
@@ -129,6 +132,7 @@ object customs_regional_reporting extends TableSpec[DmCustomsRegionalReporting] 
       marc,
       mara,
       t023t,
+      dm_t134t,
       mbew,
       t001w,
       sr_raw_hscode,
@@ -153,6 +157,7 @@ object customs_regional_reporting extends TableSpec[DmCustomsRegionalReporting] 
     val marcDf = changeFeeds(marc).snapshot().as("marc")
     val maraDf = changeFeeds(mara).snapshot().as("mara")
     val t023tDf = broadcast(changeFeeds(t023t).snapshot()).as("t023t")
+    val t134tDf = broadcast(changeFeeds(dm_t134t).snapshot()).as("t134t")
     val mbewDf = changeFeeds(mbew).snapshot().as("mbew")
     val t001wDf = changeFeeds(t001w).snapshot().as("t001w")
 
@@ -217,8 +222,18 @@ object customs_regional_reporting extends TableSpec[DmCustomsRegionalReporting] 
         "left"
       )
 
+    // LEFT JOIN T134T ON mara.(_mk_system, _mk_instance), mara.mtart
+    val withT134t = withT023t
+      .join(
+        t134tDf,
+        col("mara._mk_system") === col("t134t._mk_system") &&
+          col("mara._mk_instance") === col("t134t._mk_instance") &&
+          col("mara.mtart") === col("t134t.mtart"),
+        "left"
+      )
+
     // LEFT JOIN MBEW ON ekpo.(_mk_system, _mk_instance), ekpo.werks = mbew.bwkey, ekpo.matnr, ekpo.bwtar
-    val withMbew = withT023t
+    val withMbew = withT134t
       .join(
         mbewDf,
         col("ekpo._mk_system") === col("mbew._mk_system") &&
@@ -395,6 +410,8 @@ object customs_regional_reporting extends TableSpec[DmCustomsRegionalReporting] 
       col("mara.wrkst").as("mara_wrkst"),
       // T023T
       col("t023t.wgbez").as("matkl_text"),
+      // T134T
+      col("t134t.mtbez").as("t134t_mtbez"),
       // T001W
       col("t001w.werks").as("t001w_werks"),
       col("t001w.name1").as("t001w_name1"),
@@ -416,7 +433,7 @@ object customs_regional_reporting extends TableSpec[DmCustomsRegionalReporting] 
 
   override def validate(): Unit = {
     super.validate()
-    val expected = Set(ekko, ekpo, lfa1, t001, marc, mara, t023t, mbew, t001w, sr_raw_hscode, hawk_mdp)
+    val expected = Set(ekko, ekpo, lfa1, t001, marc, mara, t023t, dm_t134t, mbew, t001w, sr_raw_hscode, hawk_mdp)
     require(
       sourceTableSpecs.toSet == expected,
       s"customs_regional_reporting sourceTableSpecs unexpected: $sourceTableSpecs"
@@ -508,6 +525,7 @@ sealed class C_customs_regional_reporting(prefix: String) extends ColumnWithName
   val mara_matkl: ColumnWithName = ColumnWithName(prefix, "mara_matkl")
   val mara_wrkst: ColumnWithName = ColumnWithName(prefix, "mara_wrkst")
   val matkl_text: ColumnWithName = ColumnWithName(prefix, "matkl_text")
+  val t134t_mtbez: ColumnWithName = ColumnWithName(prefix, "t134t_mtbez")
   val t001w_werks: ColumnWithName = ColumnWithName(prefix, "t001w_werks")
   val t001w_name1: ColumnWithName = ColumnWithName(prefix, "t001w_name1")
   val t001w_bwkey: ColumnWithName = ColumnWithName(prefix, "t001w_bwkey")
