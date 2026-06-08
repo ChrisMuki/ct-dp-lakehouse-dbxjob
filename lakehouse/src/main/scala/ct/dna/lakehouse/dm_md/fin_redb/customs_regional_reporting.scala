@@ -14,7 +14,7 @@ import ct.dna.lakehouse.sr_raw.mn_gbl_spcustoms.{hs_codes_regional => sr_raw_hsc
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
-case class DmCustomsRegionalReporting(  
+case class DmCustomsRegionalReporting(
     @PK _mk_system: String,
     @PK _mk_instance: String,
     // EKKO - Purchasing Header

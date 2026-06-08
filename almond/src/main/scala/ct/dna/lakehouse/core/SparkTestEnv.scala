@@ -4,7 +4,6 @@ import ct.dna.lakehouse.core.runtime.SparkEnv
 import ct.dna.lakehouse.core.runtime.implicits.ConfigurationBuilderHasSparkConfig
 import ct.dna.lakehouse.core.runtime.implicits.ConfigurationHasSparkConfig
 import ct.dna.utils.runtime.Configuration
-import org.apache.spark.sql.SparkSession
 
 object SparkTestEnv {
 
@@ -19,8 +18,6 @@ object SparkTestEnv {
       )
 
   lazy val sparkConfig = config.getSparkConfig
-
-  val spark = SparkSession.active
 
   def ensureInitialized() = SparkEnv.ensureInitialized(sparkConfig)
   def idResolver = SparkEnv.idResolver
