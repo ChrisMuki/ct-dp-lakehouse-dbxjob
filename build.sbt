@@ -1,5 +1,7 @@
 import sbt._
 import Keys._
+import ct.dna.build.DbxAssemblyPlugin
+import ct.dna.build.DnaBuildPlugin.autoImport._
 
 // Shortcut task: runs the GenerateColumnWithNameAccessor main in the `devops`
 // project. Invoke as `generateColumns` (or `devops/generateColumns`).
@@ -28,7 +30,7 @@ inThisBuild(
   )
 )
 
-val dnaBomVersion = "4.12.0"
+val dnaBomVersion = "4.14.0"
 val lakehouseSrVersion = "0.10.1"
 
 lazy val lakehouse = project

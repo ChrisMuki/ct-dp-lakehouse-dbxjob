@@ -2,7 +2,11 @@ import sbt._
 import Keys._
 
 val maxParallelism = math.min(8, java.lang.Runtime.getRuntime.availableProcessors)
-val artifactoryResolver = "Artifactory Realm" at "https://artifacts.ws.contitech.cloud/artifactory/ctdna-sbt"
+val workspaceLocalIvy = Resolver.file(
+  "workspace-local-ivy",
+  file("/home/alfons/fue-scoptic/contitech/.workspace-cache/ivy2/local")
+)(Resolver.ivyStylePatterns)
+val workspaceLocalMaven = "workspace-local-maven" at "file:///home/alfons/fue-scoptic/contitech/.workspace-cache/m2"
 
 // -----------------------------------------------------------------------------
 // Build settings
@@ -30,10 +34,9 @@ inThisBuild(
     ),
     javacOptions ++= Seq("-Xlint:deprecation"),
     // Publishing and resolvers
-    resolvers += artifactoryResolver,
+    resolvers ++= Seq(workspaceLocalMaven, Resolver.mavenCentral),
     outputStrategy := Some(StdoutOutput),
-    publishTo := Some(artifactoryResolver),
-    credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
+    publishTo := Some(workspaceLocalIvy),
     // Test defaults
     Test / logBuffered := true,
     Test / fork := true,
